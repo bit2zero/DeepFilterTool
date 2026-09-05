@@ -27,6 +27,37 @@ Both perform the same processing. That the results match has been confirmed by m
 - **Your original file is never modified.** Input and output match exactly in length and timing
 - MP3, video, and real-time microphone processing are out of scope
 
+## Getting it
+
+**There are no prebuilt releases yet.** Build it yourself — only the side you need.
+
+### Command line (Windows / Linux / macOS)
+
+Requires [Rust 1.77 or later](https://rustup.rs/) (`rustup` recommended). No external crates are used, so nothing is fetched at build time.
+
+```bash
+git clone https://github.com/bit2zero/DeepFilterTool.git
+cd DeepFilterTool/cli
+./build.sh      # Linux / macOS
+build.cmd       # Windows
+```
+
+On Linux without `gcc` or `build-essential`, run `rustup target add x86_64-unknown-linux-musl` first. `build.sh` then picks musl automatically and produces a **fully static binary with no system C compiler**.
+
+### Windows GUI
+
+Nothing to install. It uses only the C# compiler that ships with Windows — no .NET SDK, no NuGet.
+
+```
+gui\build.cmd
+```
+
+### Where the binaries land
+
+Both build to the **repository root** (`deepfilter-tool` / `DeepFilterTool.exe`).
+
+**Run them from there.** Each executable looks for the engine and model in the `runtime/` directory beside it, so moving it elsewhere breaks it.
+
 ## Getting started
 
 ### Windows (graphical)

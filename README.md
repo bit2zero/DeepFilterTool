@@ -27,6 +27,37 @@
 - **元のファイルは変更しません**。入出力の長さと時間位置は完全に一致します
 - MP3・動画・マイクのリアルタイム処理は対象外です
 
+## 入手する
+
+**ビルド済みの配布物はまだありません。** 手元でビルドしてください。必要な側だけで構いません。
+
+### コマンドライン版（Windows / Linux / macOS）
+
+[Rust 1.77 以降](https://rustup.rs/)（`rustup` 推奨）が必要です。外部クレートを使わないため、ビルド時にパッケージの取得は発生しません。
+
+```bash
+git clone https://github.com/bit2zero/DeepFilterTool.git
+cd DeepFilterTool/cli
+./build.sh      # Linux / macOS
+build.cmd       # Windows
+```
+
+Linux で `gcc` や `build-essential` を入れられない環境では、先に `rustup target add x86_64-unknown-linux-musl` を実行してください。`build.sh` が自動的に musl を選び、**システムの C コンパイラなしで完全静的バイナリ**を作ります。
+
+### Windows GUI 版
+
+追加のインストールは不要です。Windows 同梱の C# コンパイラだけを使います（.NET SDK も NuGet も要りません）。
+
+```
+gui\build.cmd
+```
+
+### 生成物の置き場所
+
+どちらも実行ファイルは**リポジトリ直下**にできます（`deepfilter-tool` / `DeepFilterTool.exe`）。
+
+**この場所から動かさずに使ってください。** 実行ファイルは自分の隣にある `runtime/` からエンジンとモデルを探すため、別の場所へ移すと動きません。
+
 ## 使ってみる
 
 ### Windows（画面で操作）
