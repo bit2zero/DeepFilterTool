@@ -1,0 +1,95 @@
+name: README 翻訳
+
+# README.md（日本語）が正本。これが変わったら README.en.md を作り直す。
+#
+# 翻訳には外部サービス（Anthropic API）の呼び出しが必要なため、
+# ANTHROPIC_API_KEY を Secrets に登録した場合のみ自動生成が動く。
+# 未登録でもワークフロー自体は壊れず、pull request では「英語版が
+# 追随していない」ことを検知して知らせる。
+
+on:
+  push:
+    branches: [main]
+    paths: ["README.md"]
+  pull_request:
+    paths: ["README.md", "README.en.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # pull request では作り直さず、同期が取れているかだけを見る。
+  # フォークからの pull request では Secrets が使えず、push もできないため。
+  check:
+    name: 英語版が追随しているか
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 変更されたファイルを調べる
+        # 式展開を run: に直接埋め込まず、環境変数を経由する。
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin "$BASE_REF"
+          changed=$(git diff --name-only "origin/$BASE_REF...HEAD")
+          echo "変更されたファイル:"
+          echo "$changed" | sed 's/^/  /'
+
+          ja=false; en=false
+          echo "$changed" | grep -qx 'README.md'    && ja=true
+          echo "$changed" | grep -qx 'README.en.md' && en=true
+
+          if [ "$ja" = true ] && [ "$en" = false ]; then
+            echo "::error file=README.md::README.md を変更したら README.en.md も更新してください。ローカルでは ANTHROPIC_API_KEY=... .github/scripts/translate-readme.sh、または main へ入った時点で自動生成されます。"
+            exit 1
+          fi
+          if [ "$ja" = false ] && [ "$en" = true ]; then
+            echo "::warning file=README.en.md::日本語版を変えずに英語版だけを直しています。README.md が正本なので、次の自動生成で上書きされます。"
+          fi
+          echo "同期は取れています。"
+
+  # main に入った時点で作り直して commit する。
+  regenerate:
+    name: 英語版を作り直す
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: 翻訳して差分があれば commit
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "::warning::ANTHROPIC_API_KEY が未設定のため自動生成しません。"
+            echo "登録すると README.md の変更ごとに README.en.md を作り直します。"
+            echo "手元で作り直す場合: ANTHROPIC_API_KEY=... .github/scripts/translate-readme.sh"
+            exit 0
+          fi
+
+          set +e
+          bash .github/scripts/translate-readme.sh
+          rc=$?
+          set -e
+          case "$rc" in
+            0) ;;                                   # 変更あり
+            9) echo "英語版は最新です。"; exit 0 ;;   # 変更なし
+            *) exit "$rc" ;;
+          esac
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.en.md
+          git commit -m "$(printf 'README.en.md を再生成\n\nREADME.md（正本）の変更に追随して自動生成しました。')"
+          git push
+          echo "README.en.md を更新して push しました。"

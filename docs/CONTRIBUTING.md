@@ -47,7 +47,7 @@ cargo run --release -- check
 
 未導入でもテストは失敗せず、理由を表示して該当項目を飛ばします。
 
-<!-- AUTO-GENERATED: ビルドスクリプトと .github/workflows/ci.yml から生成。手で編集しないでください -->
+<!-- AUTO-GENERATED: ビルドスクリプト、.github/scripts、.github/workflows、および cli/src・cli/tests の参照箇所から生成。手で編集しないでください -->
 
 ## コマンド一覧
 
@@ -75,9 +75,15 @@ cargo run --release -- check
 
 `Tests.exe` は引数に文字列を渡すと名前で絞り込めます（例: `Tests.exe Read_`）。
 
+### 保守用
+
+| コマンド | 内容 |
+|---|---|
+| `.github/scripts/translate-readme.sh` | `README.md` から `README.en.md` を再生成。`ANTHROPIC_API_KEY` が必要 |
+
 ## 環境変数
 
-`cli/src` と `cli/tests` の実際の参照箇所から抽出しています。
+`cli/src`、`cli/tests`、`.github/scripts`、`.github/workflows` の実際の参照箇所から抽出しています。
 
 ### 実行時
 
@@ -93,6 +99,12 @@ cargo run --release -- check
 | `DEEPFILTER_NETWORK_TESTS` | いいえ | 設定すると、公式配布物を実際に取得する検査も走ります。既定では飛ばします | `1` |
 | `DEEPFILTER_CLEAN` | いいえ | 効果測定に使う雑音なし音声。既定は `samples/clean.wav` | `/path/to/clean.wav` |
 | `DEEPFILTER_NOISY` | いいえ | 効果測定に使う雑音入り音声。既定は `samples/noisy.wav` | `/path/to/noisy.wav` |
+
+### 保守作業時
+
+| 変数 | 必須 | 内容 | 例 |
+|---|---|---|---|
+| `ANTHROPIC_API_KEY` | 翻訳時のみ | `README.en.md` の再生成に使う。ビルドとテストには不要。CI では Secrets から読み、未設定なら自動生成をせず素通りする | `sk-ant-…` |
 
 `PATH` と `PATHEXT` は取得ツール（curl / wget / powershell）の探索に読み取るだけで、設定は不要です。
 
@@ -142,7 +154,7 @@ cargo test --all-targets
 Windowsで C# を触った場合は追加で:
 
 ```
-guibuild-tests.cmd && Tests.exe
+gui\build-tests.cmd && Tests.exe
 ```
 
 - [ ] `cargo fmt --check` が差分なし
@@ -165,6 +177,31 @@ guibuild-tests.cmd && Tests.exe
 | C# | Windows で `Tests.exe` |
 
 `cargo-llvm-cov` はバージョンとSHA-256を固定して取得しています。更新する場合は `.github/workflows/ci.yml` の `LLVM_COV_VERSION` と `LLVM_COV_SHA256` を両方直してください。
+
+## README の英語版
+
+`README.md`（日本語）が**正本**です。`README.en.md` はそこからの翻訳で、日本語版を直したら英語版も追随させます。
+
+```bash
+ANTHROPIC_API_KEY=... .github/scripts/translate-readme.sh
+```
+
+`README.en.md` を直接編集しても、次の自動生成で上書きされます。文言を変えたい場合は日本語版を直してください。
+
+### 自動化の仕組み
+
+`.github/workflows/readme-translate.yml` が 2 つの動きをします。
+
+| きっかけ | 動作 |
+|---|---|
+| pull request で `README.md` を変更 | `README.en.md` も一緒に変えているかを検査。片方だけなら落ちる |
+| `main` への push で `README.md` が変わった | `ANTHROPIC_API_KEY` があれば作り直して commit。なければ警告だけ出して素通り |
+
+**GitHub Actions 自体は翻訳できません。** 外部サービス（Anthropic API）の呼び出しが必要なので、Secrets に `ANTHROPIC_API_KEY` を登録したときだけ自動生成が動きます。未登録でもワークフローは壊れず、pull request での同期検査は動き続けます。
+
+これは本プロジェクトで唯一、実行時に外部サービスへ依存する箇所です。ビルドとテストには一切関係しないため、`ci.yml` とは別のワークフローに分けてあります。
+
+1 回あたりの費用はおおよそ 0.1 ドル未満（入力約 2,000 / 出力約 2,500 トークン）です。
 
 ## 困ったときは
 
