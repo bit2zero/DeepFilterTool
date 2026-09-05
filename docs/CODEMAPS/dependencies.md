@@ -1,4 +1,4 @@
-<!-- Generated: 2026-09-05 | Files scanned: Cargo.lock, Cargo.toml, assets.rs, ci.yml | Token estimate: ~600 -->
+<!-- Generated: 2026-09-05 | Files scanned: Cargo.lock, Cargo.toml, assets.rs, ci.yml, readme-translate.yml, translate-readme.sh | Token estimate: ~700 -->
 
 # 外部依存
 
@@ -19,8 +19,11 @@ CIの `supply-chain` ジョブが、`Cargo.lock` のパッケージ数が1でな
 | `deep-filter` | ノイズ除去のたび | はい | なし。これが処理の実体 |
 | `curl` | `setup` のときだけ | いずれか1つ | `wget`、PowerShell |
 | `xattr` | macOSの`setup`のみ | いいえ | なければ検疫属性を外さない |
+| `jq` | README翻訳のときだけ | 保守時のみ | なし。JSON組み立てに使う |
 
 `deep-filter` は `runtime/` に置き、別プロセスとして起動する。ライブラリとしてリンクはしていない。
+
+`jq` は製品側では使わない。`.github/scripts/translate-readme.sh` 専用で、ビルドにもテストにも実行にも不要。
 
 ## 取得する公式配布物
 
@@ -47,22 +50,33 @@ DeepFilterNet v0.5.6
 
 ## 通信先
 
-| 宛先 | いつ |
-|---|---|
-| `github.com` | `setup` でのエンジン取得 |
-| `raw.githubusercontent.com` | `setup` でのモデル・ライセンス取得 |
+| 宛先 | いつ | どこから |
+|---|---|---|
+| `github.com` | `setup` でのエンジン取得 | 製品 |
+| `raw.githubusercontent.com` | `setup` でのモデル・ライセンス取得 | 製品 |
+| `api.anthropic.com` | `README.en.md` の再生成 | **保守ツールのみ** |
 
-これ以外への通信はない。音声処理はすべてローカル。取得前にURLのスキームを検査し、HTTPS以外は取得しない。
+**製品が通信するのは上2つだけ**で、しかも `setup` のときに限られる。音声処理はすべてローカル。取得前にURLのスキームを検査し、HTTPS以外は取得しない。
+
+`api.anthropic.com` は `.github/scripts/translate-readme.sh` からの呼び出しで、**本プロジェクトで唯一、外部サービスに依存する箇所**。利用者の実行経路には存在せず、`ANTHROPIC_API_KEY` が未設定なら何もせず素通りする。ビルドとテストには一切関係しないため、`ci.yml` とは別のワークフローに分けてある。
 
 ## CI で使う外部のもの
 
 | 対象 | 固定方法 |
 |---|---|
-| `actions/checkout` | コミットSHA `3d3c42e5…`（v7.0.1） |
+| `actions/checkout` | コミットSHA `3d3c42e5…`（v7.0.1）。`ci.yml`・`readme-translate.yml` の両方で同じSHA |
 | `cargo-llvm-cov` | バージョン 0.9.0 + SHA-256 照合 |
 | rustup / rustc | ランナー同梱のものを使用 |
 
 第三者製アクションは使っていない。`actions/checkout` のみ。CIの `supply-chain` ジョブがタグ参照を見つけると失敗する。
+
+## Secrets
+
+| 名前 | 用途 | 未設定のとき |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | `README.en.md` の自動再生成 | 警告だけ出して素通りする。CIは壊れず、pull request での同期検査も動き続ける |
+
+ビルドとテストに必要な Secrets はない。フォークからの pull request でも CI は完走する。
 
 ## ビルドに必要なもの
 
