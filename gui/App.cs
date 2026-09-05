@@ -9,16 +9,18 @@ using System.Windows.Forms;
 
 public sealed class FilterForm : Form {
     readonly string root = AppDomain.CurrentDomain.BaseDirectory;
-    readonly TextBox file = new TextBox { ReadOnly = true, Width = 650 };
-    readonly Label status = new Label { AutoSize = false, Width = 670, Height = 70 };
-    readonly Button choose = new Button { Text = "WAVを選択", Width = 150 };
-    readonly Button run = new Button { Text = "ノイズを除去", Width = 150 };
-    readonly Button cancel = new Button { Text = "中止", Width = 100, Enabled = false };
-    readonly Button before = new Button { Text = "元の音声を再生", Width = 150 };
-    readonly Button after = new Button { Text = "処理後を再生", Width = 150, Enabled = false };
-    readonly Button save = new Button { Text = "名前を付けて保存", Width = 170, Enabled = false };
-    readonly CheckBox pf = new CheckBox { Text = "強めの除去（ポストフィルター）", AutoSize = true };
-    readonly NumericUpDown strength = new NumericUpDown { Minimum = 1, Maximum = 100, Value = 100, Width = 75 };
+    // AccessibleName は支援技術（スクリーンリーダー）と UI Automation に公開される識別子。
+    // 表示文字列と違って見た目の都合では変えない。gui/Tests.cs が検査している。
+    readonly TextBox file = new TextBox { ReadOnly = true, Width = 650, AccessibleName = "選択中のファイル" };
+    readonly Label status = new Label { AutoSize = false, Width = 670, Height = 70, AccessibleName = "状態" };
+    readonly Button choose = new Button { Text = "WAVを選択", Width = 150, AccessibleName = "WAVを選択" };
+    readonly Button run = new Button { Text = "ノイズを除去", Width = 150, AccessibleName = "ノイズを除去" };
+    readonly Button cancel = new Button { Text = "中止", Width = 100, Enabled = false, AccessibleName = "中止" };
+    readonly Button before = new Button { Text = "元の音声を再生", Width = 150, AccessibleName = "元の音声を再生" };
+    readonly Button after = new Button { Text = "処理後を再生", Width = 150, Enabled = false, AccessibleName = "処理後を再生" };
+    readonly Button save = new Button { Text = "名前を付けて保存", Width = 170, Enabled = false, AccessibleName = "名前を付けて保存" };
+    readonly CheckBox pf = new CheckBox { Text = "強めの除去（ポストフィルター）", AutoSize = true, AccessibleName = "強めの除去" };
+    readonly NumericUpDown strength = new NumericUpDown { Minimum = 1, Maximum = 100, Value = 100, Width = 75, AccessibleName = "最大ノイズ抑制 (dB)" };
     readonly ProgressBar progress = new ProgressBar { Width = 650, Height = 8 };
     readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 200 };
     System.Media.SoundPlayer player;
@@ -38,7 +40,7 @@ public sealed class FilterForm : Form {
         var actions = new FlowLayoutPanel { Width = 670, Height = 42 }; actions.Controls.Add(run); actions.Controls.Add(cancel); stack.Controls.Add(actions);
         stack.Controls.Add(progress); stack.Controls.Add(status);
         var listen = new FlowLayoutPanel { Width = 670, Height = 42 }; listen.Controls.Add(before); listen.Controls.Add(after); listen.Controls.Add(save); stack.Controls.Add(listen);
-        var stop = new Button { Text = "再生停止", Width = 100 }; stack.Controls.Add(stop);
+        var stop = new Button { Text = "再生停止", Width = 100, AccessibleName = "再生停止" }; stack.Controls.Add(stop);
         choose.Click += delegate { using (var d = new OpenFileDialog { Filter = "WAV 音声|*.wav", CheckFileExists = true }) { if (d.ShowDialog() == DialogResult.OK) { file.Text = d.FileName; result = null; after.Enabled = save.Enabled = false; status.Text = "準備できました。"; } } };
         run.Click += delegate { StartFilter(); };
         cancel.Click += delegate { CancelFilter(); };
