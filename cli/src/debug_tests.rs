@@ -27,6 +27,18 @@ fn emitting_never_panics_whether_enabled_or_not() {
 }
 
 #[test]
+fn emit_block_handles_empty_and_multiline_bodies_when_enabled() {
+    // emit_block は無効時に何もせず戻るため、有効にした状態でも通しておく。
+    let before = enabled();
+    enable();
+    emit_block("空の出力", "");
+    emit_block("空白だけ", "   \n\n  ");
+    emit_block("複数行", "1 行目\n2 行目\n3 行目\n");
+    emit_block("末尾の改行なし", "最後の行");
+    ENABLED.store(before, Ordering::Relaxed);
+}
+
+#[test]
 fn environment_switch_reads_the_variable() {
     // 値を書き換えずに、判定関数が例外なく動くことだけを確かめる。
     // 実際の DEEPFILTER_DEBUG=1 での挙動は統合テストで確認する。

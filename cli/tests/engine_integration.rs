@@ -975,3 +975,168 @@ fn the_repository_carries_its_license_files() {
         "上流のMIT本文が同梱されている"
     );
 }
+
+#[test]
+fn reports_the_input_format_for_float32_sources() {
+    if skip_unless_ready() {
+        return;
+    }
+    let dir = work_dir("float32");
+    let frames = 4_800usize;
+    // IEEE Float 32bit の入力を用意する。PCM とは別の経路を通る。
+    let mut body = Vec::with_capacity(frames * 4);
+    for frame in 0..frames {
+        let value = 0.2f32 * (frame as f32 * 2.0 * std::f32::consts::PI * 220.0 / 48_000.0).sin();
+        body.extend_from_slice(&value.to_le_bytes());
+    }
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"RIFF");
+    bytes.extend_from_slice(&((36 + body.len()) as u32).to_le_bytes());
+    bytes.extend_from_slice(b"WAVEfmt ");
+    bytes.extend_from_slice(&16u32.to_le_bytes());
+    bytes.extend_from_slice(&3u16.to_le_bytes()); // IEEE Float
+    bytes.extend_from_slice(&1u16.to_le_bytes());
+    bytes.extend_from_slice(&48_000u32.to_le_bytes());
+    bytes.extend_from_slice(&(48_000u32 * 4).to_le_bytes());
+    bytes.extend_from_slice(&4u16.to_le_bytes());
+    bytes.extend_from_slice(&32u16.to_le_bytes());
+    bytes.extend_from_slice(b"data");
+    bytes.extend_from_slice(&(body.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(&body);
+
+    let input = dir.join("float.wav");
+    std::fs::write(&input, bytes).unwrap();
+    let output = dir.join("out.wav");
+
+    let out = run_in(
+        &dir,
+        &[
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--debug",
+            "-q",
+        ],
+    );
+    assert!(
+        out.status.success(),
+        "Float32 入力で失敗: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let log = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        log.contains("IEEE Float"),
+        "入力形式を IEEE Float と出す:\n{}",
+        log
+    );
+    assert!(log.contains("32 bit"), "ビット深度を出す");
+
+    // 出力は再生互換性のため PCM 16bit に変換される。
+    let result = parse_wav(&output);
+    assert_eq!(result.bits, 16, "PCM 16bit で出力");
+    assert_eq!(result.data.len(), frames * 2, "長さは保たれる");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn tells_where_the_work_folder_was_left_when_the_engine_fails() {
+    let dir = work_dir("leftover");
+    let input = dir.join("in.wav");
+    write_test_wav(&input, 1);
+
+    // 必ず失敗するエンジンの代役を置く。ログが残るので場所を知らせるはず。
+    let fake = dir.join(if cfg!(windows) { "fake.cmd" } else { "fake.sh" });
+    if cfg!(windows) {
+        std::fs::write(
+            &fake,
+            "@echo off\r\necho 失敗しました 1>&2\r\nexit /b 7\r\n",
+        )
+        .unwrap();
+    } else {
+        std::fs::write(&fake, "#!/bin/sh\necho 失敗しました >&2\nexit 7\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+    }
+
+    let out = Command::new(BIN)
+        .env("DEEPFILTER_HOME", &dir)
+        .args([
+            "--engine",
+            fake.to_str().unwrap(),
+            "--model",
+            model_or_placeholder(&dir).to_str().unwrap(),
+            input.to_str().unwrap(),
+            "-o",
+            dir.join("out.wav").to_str().unwrap(),
+            "-q",
+        ])
+        .output()
+        .expect("起動");
+
+    assert!(!out.status.success(), "エンジンが失敗したら失敗として返す");
+    let text = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        text.contains("エンジン終了コード 7"),
+        "終了コードを伝える: {}",
+        text
+    );
+    assert!(
+        text.contains("作業フォルダーを残しました"),
+        "調べられるよう場所を伝える: {}",
+        text
+    );
+
+    let sessions: Vec<PathBuf> = std::fs::read_dir(dir.join("sessions"))
+        .expect("sessions が作られる")
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .collect();
+    assert_eq!(sessions.len(), 1, "作業フォルダーが残る");
+    assert!(sessions[0].join("engine.log").is_file(), "ログが残る");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// モデルは中身を見ないので、なければ置き場所だけ用意して代用する。
+fn model_or_placeholder(dir: &Path) -> PathBuf {
+    let real = model_file_path();
+    if real.is_file() {
+        return real;
+    }
+    let placeholder = dir.join("model.tar.gz");
+    std::fs::write(&placeholder, b"placeholder").unwrap();
+    placeholder
+}
+
+fn model_file_path() -> PathBuf {
+    repo_root()
+        .join("runtime")
+        .join("DeepFilterNet3_onnx.tar.gz")
+}
+
+#[test]
+fn rejects_output_paths_without_a_file_name() {
+    let dir = work_dir("nofilename");
+    let input = dir.join("in.wav");
+    write_test_wav(&input, 1);
+
+    for target in ["..", "."] {
+        let out = Command::new(BIN)
+            .env("DEEPFILTER_HOME", &dir)
+            .args([input.to_str().unwrap(), "-o", target, "-q"])
+            .output()
+            .expect("起動");
+        assert!(!out.status.success(), "{} を出力先として断る", target);
+        let text = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            text.contains("ファイル名") || text.contains("別の名前"),
+            "{} の理由を伝える: {}",
+            target,
+            text
+        );
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -368,3 +368,54 @@ fn the_current_directory_is_never_part_of_the_search_path() {
         );
     }
 }
+
+#[test]
+fn find_root_falls_back_to_the_executable_location() {
+    // 単体テストの本体には DEEPFILTER_HOME を設定していないので、
+    // 環境変数がない場合の経路をここで通す。
+    let root = find_root();
+    match std::env::var_os("DEEPFILTER_HOME") {
+        Some(home) => assert_eq!(root, PathBuf::from(home), "指定があればそれに従う"),
+        None => {
+            let exe_dir = std::env::current_exe()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .to_path_buf();
+            assert!(
+                exe_dir.starts_with(&root),
+                "実行ファイルの位置かその上位を返す: {}",
+                root.display()
+            );
+        }
+    }
+}
+
+/// エンジンがシグナルで落ちた場合。終了コードがないので、その旨を伝える。
+#[cfg(unix)]
+#[test]
+fn run_reports_a_signal_terminated_engine() {
+    let dir = scratch("signal");
+    let engine = fake_engine(&dir, "kill -9 $$");
+    let model = dummy_model(&dir);
+    let input = dir.join("in.wav");
+    write_wav(&input, 480);
+    let session = new_session(&dir).unwrap();
+
+    let job = job_in(&dir, &engine, &model, &input, &session, 100);
+    let err = run(&job).unwrap_err();
+    assert!(
+        err.0.contains("シグナルによる終了"),
+        "終了コードがないことを伝える: {}",
+        err.0
+    );
+    assert!(session.join("engine.log").is_file(), "ログは残す");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn utc_stamp_never_produces_a_negative_year() {
+    // duration_since が失敗する時刻でも 0 秒として扱い、破綻しないこと。
+    let before_epoch = UNIX_EPOCH - std::time::Duration::from_secs(60 * 60 * 24 * 365);
+    assert_eq!(utc_stamp(&before_epoch), "19700101-000000");
+}

@@ -121,8 +121,12 @@ fn install_refuses_to_replace_a_differing_file_without_force() {
 fn download_failure_leaves_no_partial_file() {
     let dir = scratch("download-fail");
     let dest = dir.join("partial.bin");
+    // 取得の様子がログに出る経路も通しておく。状態は後で戻す。
+    let debug_before = crate::debug::enabled();
+    crate::debug::enable();
     // 到達不能なローカルポート。外部への通信は発生しない。
     let err = download("https://127.0.0.1:1/nothing", &dest).unwrap_err();
+    crate::debug::set_enabled(debug_before);
     assert!(
         err.0.contains("ダウンロードに失敗しました") || err.0.contains("curl か wget"),
         "失敗を伝える: {}",
@@ -421,4 +425,107 @@ fn every_pinned_url_is_https() {
             asset.url
         );
     }
+}
+
+#[test]
+fn verify_reports_a_missing_or_unreadable_file() {
+    let dir = scratch("verify-io");
+    let asset = Asset {
+        file: "nothing.bin",
+        url: "https://127.0.0.1:1/x",
+        bytes: 3,
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000",
+    };
+
+    // 存在しないファイル。
+    assert!(
+        verify(&dir.join("nothing.bin"), &asset).is_err(),
+        "未存在を断る"
+    );
+
+    // フォルダーを渡された場合も、パニックせずエラーになること。
+    let as_dir = dir.join("as-dir");
+    fs::create_dir_all(&as_dir).unwrap();
+    let sized = Asset {
+        bytes: as_dir.metadata().unwrap().len(),
+        ..asset
+    };
+    assert!(verify(&as_dir, &sized).is_err(), "フォルダーを断る");
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[cfg(unix)]
+#[test]
+fn make_executable_reports_a_missing_file() {
+    let dir = scratch("chmod-missing");
+    assert!(
+        make_executable(&dir.join("nothing")).is_err(),
+        "存在しないファイルはエラーにする"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// 配置先が中身のあるフォルダーで塞がれている場合。
+///
+/// 取得に成功しても置き換えられないので、黙って失敗せず場所を添えて断ること。
+/// 実際に取得しないとこの経路に入らないため、通信ありのときだけ実行する。
+#[test]
+fn install_reports_a_target_that_cannot_be_replaced() {
+    if std::env::var_os("DEEPFILTER_NETWORK_TESTS").is_none() {
+        eprintln!("スキップ: 通信を伴う検査です。DEEPFILTER_NETWORK_TESTS=1 で実行してください。");
+        return;
+    }
+    let dir = scratch("install-blocked");
+    let asset = assets::SHARED.iter().min_by_key(|a| a.bytes).unwrap();
+
+    // 配置先を、削除できないフォルダーで塞いでおく。
+    let blocked = dir.join(asset.file);
+    fs::create_dir_all(blocked.join("中身")).unwrap();
+    fs::write(blocked.join("中身").join("file.txt"), b"x").unwrap();
+
+    let err = install(&dir, asset, true, false).unwrap_err();
+    assert!(err.0.contains("配置できません"), "理由を伝える: {}", err.0);
+    assert!(
+        err.0.contains(&blocked.display().to_string()),
+        "場所を添える"
+    );
+    assert!(blocked.is_dir(), "既存のフォルダーを壊さない");
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn run_reports_a_runtime_path_that_is_not_a_folder() {
+    let dir = scratch("run-blocked");
+    fs::write(dir.join("runtime"), "これはファイル".as_bytes()).unwrap();
+
+    let platform = platform_key_for_tests().unwrap_or("linux-x86_64");
+    let err = run(&dir, platform, false).unwrap_err();
+    assert!(
+        err.0.contains("runtime フォルダーを作れません"),
+        "作れない理由を伝える: {}",
+        err.0
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn run_stops_when_an_existing_file_differs_from_the_pinned_one() {
+    let dir = scratch("run-mismatch");
+    let runtime = dir.join("runtime");
+    fs::create_dir_all(&runtime).unwrap();
+    // 固定版と違う中身を、共通ファイルの名前で置いておく。
+    for asset in assets::SHARED {
+        fs::write(runtime.join(asset.file), b"different content").unwrap();
+    }
+
+    let platform = platform_key_for_tests().unwrap_or("linux-x86_64");
+    let err = run(&dir, platform, false).unwrap_err();
+    assert!(
+        err.0.contains("--force"),
+        "入れ替え方法を案内する: {}",
+        err.0
+    );
+    let _ = fs::remove_dir_all(&dir);
 }

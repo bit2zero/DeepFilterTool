@@ -148,8 +148,10 @@ fn utc_stamp(now: &SystemTime) -> String {
     let days = secs.div_euclid(86_400);
     let time = secs.rem_euclid(86_400);
     // Howard Hinnant の civil_from_days。
+    // secs は上で 0 未満にならないようにしているので、z も必ず正になる。
+    // 元の式にある負数向けの補正は起こりえないため省いてある。
     let z = days + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let era = z / 146_097;
     let doe = z - era * 146_097;
     let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
     let y = yoe + era * 400;

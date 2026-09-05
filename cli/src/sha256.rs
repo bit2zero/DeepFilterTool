@@ -192,4 +192,39 @@ mod tests {
         }
         assert_eq!(hex(&whole.finish()), hex(&split.finish()));
     }
+
+    #[test]
+    fn default_matches_new() {
+        assert_eq!(
+            hex(&Sha256::default().finish()),
+            hex(&Sha256::new().finish()),
+            "Default と new() は同じ初期状態"
+        );
+    }
+
+    #[test]
+    fn file_hex_matches_the_in_memory_digest() {
+        let path = std::env::temp_dir().join(format!("deepfilter-sha-{}.bin", std::process::id()));
+        let body: Vec<u8> = (0..100_000u32).map(|i| (i % 253) as u8).collect();
+        std::fs::write(&path, &body).unwrap();
+
+        let mut digest = Sha256::new();
+        digest.update(&body);
+        assert_eq!(file_hex(&path).unwrap(), hex(&digest.finish()));
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn file_hex_reports_paths_it_cannot_read() {
+        let missing = std::env::temp_dir().join("deepfilter-sha-does-not-exist.bin");
+        let _ = std::fs::remove_file(&missing);
+        assert!(file_hex(&missing).is_err(), "存在しないファイルはエラー");
+
+        // フォルダーは開けても読めない。パニックせずエラーになること。
+        let dir = std::env::temp_dir().join(format!("deepfilter-sha-dir-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        assert!(file_hex(&dir).is_err(), "フォルダーはエラー");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

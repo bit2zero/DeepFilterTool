@@ -28,6 +28,12 @@ pub fn enabled() -> bool {
     ENABLED.load(Ordering::Relaxed)
 }
 
+/// 有効・無効を戻すための入口。検査で一時的に切り替えたあと元に戻すのに使う。
+#[cfg(test)]
+pub fn set_enabled(value: bool) {
+    ENABLED.store(value, Ordering::Relaxed);
+}
+
 pub fn emit(args: Arguments<'_>) {
     let elapsed = START.get_or_init(Instant::now).elapsed();
     let mut err = std::io::stderr().lock();
