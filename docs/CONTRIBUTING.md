@@ -166,6 +166,31 @@ guibuild-tests.cmd && Tests.exe
 
 `cargo-llvm-cov` はバージョンとSHA-256を固定して取得しています。更新する場合は `.github/workflows/ci.yml` の `LLVM_COV_VERSION` と `LLVM_COV_SHA256` を両方直してください。
 
+## README の英語版
+
+`README.md`（日本語）が**正本**です。`README.en.md` はそこからの翻訳で、日本語版を直したら英語版も追随させます。
+
+```bash
+ANTHROPIC_API_KEY=... .github/scripts/translate-readme.sh
+```
+
+`README.en.md` を直接編集しても、次の自動生成で上書きされます。文言を変えたい場合は日本語版を直してください。
+
+### 自動化の仕組み
+
+`.github/workflows/readme-translate.yml` が 2 つの動きをします。
+
+| きっかけ | 動作 |
+|---|---|
+| pull request で `README.md` を変更 | `README.en.md` も一緒に変えているかを検査。片方だけなら落ちる |
+| `main` への push で `README.md` が変わった | `ANTHROPIC_API_KEY` があれば作り直して commit。なければ警告だけ出して素通り |
+
+**GitHub Actions 自体は翻訳できません。** 外部サービス（Anthropic API）の呼び出しが必要なので、Secrets に `ANTHROPIC_API_KEY` を登録したときだけ自動生成が動きます。未登録でもワークフローは壊れず、pull request での同期検査は動き続けます。
+
+これは本プロジェクトで唯一、実行時に外部サービスへ依存する箇所です。ビルドとテストには一切関係しないため、`ci.yml` とは別のワークフローに分けてあります。
+
+1 回あたりの費用はおおよそ 0.1 ドル未満（入力約 2,000 / 出力約 2,500 トークン）です。
+
 ## 困ったときは
 
 | 症状 | 原因と対処 |
