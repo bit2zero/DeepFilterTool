@@ -1,3 +1,5 @@
+// Copyright (c) 2026 bit2zero
+// MIT License. See LICENSE and NOTICE.md in the repository root.
 using System;
 using System.IO;
 using System.Text;
@@ -8,9 +10,12 @@ public sealed class WaveData {
     public byte[] Data;
     public static WaveData Read(string path) {
         using (var r = new BinaryReader(File.OpenRead(path))) {
-            if (Encoding.ASCII.GetString(r.ReadBytes(4)) != "RIFF") throw new Exception("RIFF WAV を選んでください。");
-            uint riff = r.ReadUInt32();
-            if (Encoding.ASCII.GetString(r.ReadBytes(4)) != "WAVE" || (long)riff + 8 > r.BaseStream.Length) throw new Exception("WAV ヘッダーが壊れています。");
+            // 12バイトまとめて読む。分割して読むと、途中で切れたファイルで
+            // BinaryReader が内部例外を投げ、案内にならないメッセージが表示される。
+            byte[] head = r.ReadBytes(12);
+            if (head.Length < 12 || Encoding.ASCII.GetString(head, 0, 4) != "RIFF") throw new Exception("RIFF WAV を選んでください。");
+            uint riff = BitConverter.ToUInt32(head, 4);
+            if (Encoding.ASCII.GetString(head, 8, 4) != "WAVE" || (long)riff + 8 > r.BaseStream.Length) throw new Exception("WAV ヘッダーが壊れています。");
             var w = new WaveData(); bool fmt = false;
             long end = (long)riff + 8;
             while (r.BaseStream.Position + 8 <= end) {

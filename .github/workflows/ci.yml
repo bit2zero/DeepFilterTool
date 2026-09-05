@@ -1,0 +1,172 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# 既定を最小権限にする。個々のジョブで必要な分だけ足す。
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # 依存クレートがないので取得もしない。誤って増えたら supply-chain ジョブが落とす。
+  CARGO_NET_OFFLINE: "true"
+
+jobs:
+  # 供給網の不変条件を最初に確かめる。ここが崩れたら以降を回す意味がない。
+  supply-chain:
+    name: 供給網の検査
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 第三者クレートがゼロであること
+        run: |
+          set -euo pipefail
+          count=$(grep -c '^\[\[package\]\]' cli/Cargo.lock)
+          echo "Cargo.lock のパッケージ数: $count"
+          if [ "$count" -ne 1 ]; then
+            echo "::error::外部クレートが追加されています。本プロジェクトは標準ライブラリのみで完結させる方針です。"
+            grep -A1 '^\[\[package\]\]' cli/Cargo.lock
+            exit 1
+          fi
+
+      - name: Cargo.toml に [dependencies] の中身がないこと
+        run: |
+          set -euo pipefail
+          if awk '/^\[dependencies\]/{f=1;next} /^\[/{f=0} f && NF && $0 !~ /^#/' cli/Cargo.toml | grep -q .; then
+            echo "::error::[dependencies] に項目が追加されています。"
+            exit 1
+          fi
+          echo "依存なしを確認しました。"
+
+      - name: 導入物の固定情報が manifest と一致すること
+        run: |
+          set -euo pipefail
+          # manifest.json は cli/src/assets.rs から生成される。乖離していないか確かめる。
+          for url in $(grep -o '"url": "[^"]*"' runtime/manifest.json | cut -d'"' -f4); do
+            case "$url" in
+              https://github.com/Rikorose/DeepFilterNet/*|https://raw.githubusercontent.com/Rikorose/DeepFilterNet/*) ;;
+              *) echo "::error::想定外の取得元です: $url"; exit 1 ;;
+            esac
+          done
+          count=$(grep -c '"sha256"' runtime/manifest.json)
+          echo "SHA-256 で固定された配布物: $count 件"
+          [ "$count" -ge 7 ] || { echo "::error::固定情報が欠けています。"; exit 1; }
+
+      - name: ワークフローの第三者アクションがコミット SHA で固定されていること
+        run: |
+          set -euo pipefail
+          # 行頭からの uses: だけを拾う。こうしないと、この検査自身が書いている
+          # 検索パターンの文字列にもマッチしてしまう。
+          refs=$(grep -rhoE '^[[:space:]]*-?[[:space:]]*uses:[[:space:]]+[^[:space:]]+' \
+                   .github/workflows | awk '{print $NF}' | sort -u)
+          if [ -z "$refs" ]; then
+            echo "::error::uses: の行が見つかりません。検査が壊れています。"
+            exit 1
+          fi
+          echo "$refs" | sed 's/^/  /'
+          bad=$(echo "$refs" | grep -vE '@[0-9a-f]{40}$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::タグ参照のアクションがあります（SHA で固定してください）: $bad"
+            exit 1
+          fi
+          echo "すべて 40 桁のコミット SHA で固定されています。"
+
+  rust:
+    name: Rust (${{ matrix.os }})
+    needs: supply-chain
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # ランナー同梱の rustup を使う。第三者アクションを増やさないため。
+      - name: ツールチェーンを揃える
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal --component clippy,rustfmt
+          rustup default stable
+          rustc --version && cargo --version
+
+      - name: 書式
+        working-directory: cli
+        run: cargo fmt --check
+
+      - name: 静的解析
+        working-directory: cli
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: 公式エンジンとモデルを導入
+        working-directory: cli
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --release -- setup
+          cargo run --release -- check
+
+      - name: テスト
+        working-directory: cli
+        run: cargo test --all-targets
+
+  coverage:
+    name: カバレッジ
+    needs: supply-chain
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: ツールチェーンを揃える
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal --component llvm-tools-preview
+          rustup default stable
+
+      - name: cargo-llvm-cov を取得（SHA-256 を照合してから使う）
+        env:
+          LLVM_COV_VERSION: "0.9.0"
+          LLVM_COV_SHA256: "bc2122fd7bd9b6d3eb371690ed085f82e5a8bf1851f4645ef521d12ed04b2616"
+        run: |
+          set -euo pipefail
+          url="https://github.com/taiki-e/cargo-llvm-cov/releases/download/v${LLVM_COV_VERSION}/cargo-llvm-cov-x86_64-unknown-linux-musl.tar.gz"
+          curl --proto '=https' --tlsv1.2 -sSfL -o cov.tar.gz "$url"
+          echo "${LLVM_COV_SHA256}  cov.tar.gz" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin" && tar xzf cov.tar.gz -C "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: 公式エンジンとモデルを導入
+        working-directory: cli
+        run: cargo run --release -- setup
+
+      - name: 計測（下限 85%）
+        working-directory: cli
+        run: cargo llvm-cov --all-targets --fail-under-lines 85
+
+  csharp:
+    name: C# (Windows)
+    needs: supply-chain
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Windows 同梱の C# コンパイラだけを使う。NuGet も .NET SDK も使わない。
+      - name: 単体テストをビルドして実行
+        shell: cmd
+        run: |
+          call Build-Tests.cmd || exit /b 1
+          Tests.exe || exit /b 1
