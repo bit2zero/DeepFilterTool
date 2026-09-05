@@ -16,6 +16,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Windows.Forms;
 
 // ---------------------------------------------------------------- 最小の枠組み
 
@@ -629,9 +630,76 @@ public sealed class WaveDataConversionTests {
     }
 }
 
+// ------------------------------------------------------ 画面の読み上げ対応
+
+/// 支援技術（スクリーンリーダー）から見た画面の検査。
+///
+/// 表示文字列ではなく AccessibleName を見る。表示文字列は見た目の都合で変わるが、
+/// AccessibleName は支援技術と UI Automation に公開される識別子で、安定していなければ
+/// ならない。エンジンもモデルも要らないため、通常の単体テストとして走る。
+public sealed class FormAccessibilityTests : IDisposable {
+    readonly FilterForm form = new FilterForm();
+
+    public void Dispose() { form.Dispose(); }
+
+    /// 利用者が操作できる部品だけを集める。対話部品の内部実装には降りない
+    /// （NumericUpDown は内部に自前の TextBox とボタンを持つため）。
+    static void Collect(Control parent, List<Control> found) {
+        foreach (Control child in parent.Controls) {
+            if (IsInteractive(child)) found.Add(child);
+            else Collect(child, found);
+        }
+    }
+
+    static bool IsInteractive(Control c) {
+        return c is Button || c is TextBox || c is CheckBox || c is NumericUpDown;
+    }
+
+    List<Control> Interactive() {
+        var found = new List<Control>();
+        Collect(form, found);
+        return found;
+    }
+
+    /// 探索そのものの見張り。ここが 0 を返すようになると、以下の検査は
+    /// 何も確かめないまま通ってしまう。
+    [Fact]
+    public void Form_ExposesEveryInteractiveControl() {
+        Assert.Equal(10, Interactive().Count,
+            "操作できる部品は10個（テキストボックス1・ボタン7・チェックボックス1・数値入力1）");
+    }
+
+    [Fact]
+    public void Form_EveryInteractiveControlHasAnAccessibleName() {
+        var missing = Interactive()
+            .Where(delegate(Control c) { return string.IsNullOrEmpty(c.AccessibleName); })
+            .Select(delegate(Control c) { return c.GetType().Name + "(\"" + c.Text + "\")"; })
+            .ToList();
+
+        Assert.True(missing.Count == 0,
+            "すべての操作部品に AccessibleName がある\n      無い部品: " + string.Join(", ", missing.ToArray()));
+    }
+
+    [Fact]
+    public void Form_AccessibleNamesAreUnique() {
+        var duplicates = Interactive()
+            .Select(delegate(Control c) { return c.AccessibleName; })
+            .Where(delegate(string n) { return !string.IsNullOrEmpty(n); })
+            .GroupBy(delegate(string n) { return n; })
+            .Where(delegate(IGrouping<string, string> g) { return g.Count() > 1; })
+            .Select(delegate(IGrouping<string, string> g) { return g.Key; })
+            .ToList();
+
+        Assert.True(duplicates.Count == 0,
+            "AccessibleName が重複していない\n      重複: " + string.Join(", ", duplicates.ToArray()));
+    }
+}
+
 // -------------------------------------------------------------------- 実行部
 
 public static class TestRunner {
+    // FilterForm を作るテストがあるため STA が要る。WinForms は STA を前提にする。
+    [STAThread]
     public static int Main(string[] args) {
         Console.OutputEncoding = Encoding.UTF8;
         string filter = args.Length > 0 ? args[0] : null;
