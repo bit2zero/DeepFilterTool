@@ -29,5 +29,17 @@
 - **設定による差はごくわずか**です。`-a` は抑制の上限を決める値で、この音源では上限に達していないため効きません。雑音が大きい音源で差が出ます。`--pf` はわずかに強く効きます。
 - 処理の前後で**時間が 1 サンプルもずれません**（遅延補正が正しく働いています）。
 
-この測定は `cli/tests/noise_reduction.rs` で自動化しています。手元の音源で確かめるには、ノイズのない音声と、それに雑音を重ねた音声（**同じ長さ・同じ時間位置**）を用意し、`samples/clean.wav` と `samples/noisy.wav` に置くか、環境変数 `DEEPFILTER_CLEAN` / `DEEPFILTER_NOISY` で指定してください。音声ファイル自体はリポジトリに含めません。
+この測定は `cli/tests/noise_reduction.rs` で自動化しています。上表の音源は `samples/clean.wav` と `samples/noisy.wav` としてリポジトリに含めているので、クローンすればそのまま再現できます。
+
+```bash
+cd cli
+cargo test --test noise_reduction -- --nocapture
+```
+
+手元の音源で確かめる場合は、ノイズのない音声と、それに雑音を重ねた音声（**同じ長さ・同じ時間位置**）を用意し、環境変数で指定してください。
+
+```bash
+DEEPFILTER_CLEAN=/path/to/clean.wav DEEPFILTER_NOISY=/path/to/noisy.wav \
+  cargo test --test noise_reduction -- --nocapture
+```
 
