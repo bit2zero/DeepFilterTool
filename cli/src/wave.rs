@@ -1,4 +1,4 @@
-//! 48 kHz WAV の読み書き。Windows 版 AudioCore.cs と同じ検証規則・同じ出力バイト列。
+//! 48 kHz WAV の読み書き。Windows 版 gui/AudioCore.cs と同じ検証規則・同じ出力バイト列。
 
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};

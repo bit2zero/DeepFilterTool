@@ -1,4 +1,4 @@
-<!-- Generated: 2026-09-05 | Files scanned: 4 (*.cs) | Token estimate: ~700 -->
+<!-- Generated: 2026-09-05 | Files scanned: 4 (gui/*.cs) | Token estimate: ~700 -->
 
 # GUI（C# / WinForms）の内部
 
@@ -8,12 +8,12 @@ Windows専用。.NET Framework（Windows同梱）のみで動く。外部パッ�
 
 | ファイル | 行 | 役割 |
 |---|---|---|
-| `App.cs` | 111 | `FilterForm`。画面とエンジン起動 |
-| `AudioCore.cs` | 64 | `WaveData`。RIFF/WAVの読み書きと変換 |
-| `Tests.cs` | 714 | `WaveData` の単体テスト60件 + xUnit相当の枠組み |
-| `Verify.cs` | 57 | 実エンジンとGUIを通す統合テスト |
+| `gui/App.cs` | 111 | `FilterForm`。画面とエンジン起動 |
+| `gui/AudioCore.cs` | 64 | `WaveData`。RIFF/WAVの読み書きと変換 |
+| `gui/Tests.cs` | 714 | `WaveData` の単体テスト60件 + xUnit相当の枠組み |
+| `gui/Verify.cs` | 57 | 実エンジンとGUIを通す統合テスト |
 
-`App.cs` と `AudioCore.cs` の関係は、CLI版の `main.rs`+`engine.rs` と `wave.rs` に対応する。
+`gui/App.cs` と `gui/AudioCore.cs` の関係は、CLI版の `main.rs`+`engine.rs` と `wave.rs` に対応する。
 
 ## 画面の構成
 
@@ -78,9 +78,9 @@ FilterForm （縦積み FlowLayoutPanel）
 
 ## テスト
 
-`Tests.exe`（`Build-Tests.cmd` で生成）が `WaveData` の60件を検査。エンジン不要で数十ミリ秒。
+`Tests.exe`（`gui/build-tests.cmd` で生成）が `WaveData` の60件を検査。エンジン不要で数十ミリ秒。
 
-`Verify.exe`（`Build-Verify.cmd`）は実エンジンとGUIを通す統合テスト。リフレクションで `FilterForm` の私有メンバーを操作し、モノラル／ステレオ両方で以下を確認する。
+`Verify.exe`（`gui/build-verify.cmd`）は実エンジンとGUIを通す統合テスト。リフレクションで `FilterForm` の私有メンバーを操作し、モノラル／ステレオ両方で以下を確認する。
 
 - 長さ・チャンネル数・サンプルレートの保持
 - PCM16での出力
