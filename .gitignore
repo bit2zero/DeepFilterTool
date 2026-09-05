@@ -22,3 +22,6 @@ cli/target/
 # C# テストの成果物（*.exe は既に無視対象。念のため明示）
 Tests.exe
 
+
+# 生成した解析レポート
+.reports/
