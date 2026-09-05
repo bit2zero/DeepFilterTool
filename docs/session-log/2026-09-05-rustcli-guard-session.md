@@ -1,9 +1,9 @@
 # Session: 2026-09-05
 
 **Started:** 20:00 前後（最初のコミットは 20:49）
-**Last Updated:** 22:35
+**Last Updated:** 23:21
 **Project:** DeepFilterTool (`C:\Users\takuk\Documents\GitHub\DeepFilterTool`)
-**Topic:** Windows 専用だった音声ノイズ除去ツールを Rust CLI で Linux / macOS 対応にし、テスト・CI・ドキュメント・供給網対策・safety-guard まで整備した
+**Topic:** Windows 専用だった音声ノイズ除去ツールを Rust CLI で Linux / macOS 対応にし、テスト・CI・ドキュメント・供給網対策・safety-guard を整備して v0.1.0 を公開した
 
 ---
 
@@ -30,7 +30,11 @@ C# 以外の選択肢を検討した結果、**Rust で CLI 版のみ**を先に
 - **PR 4 本すべてマージ済み** — 確認方法: `gh pr list --state all` が #1〜#4 すべて MERGED。`main` は `378a1e5`、作業ツリーに差分なし
 - **README 英語版の同期検査** — 確認方法: PR #4 で「英語版が追随しているか」ジョブが pass
 - **safety-guard が実際に効いている** — 確認方法: **本物のブロックを 2 回観測した**。(1) `echo "proof only: git push --force"` が deny されてコマンドが実行されなかった。(2) リポジトリ外へのファイル書き込みが deny された。どちらも `~/.claude/safety-guard.log` に記録が残っている
-- **画面の読み上げ対応（`AccessibleName`）を TDD で追加** — 確認方法: RED（`成功 2 / 失敗 1`、10 部品すべてに名前が無いと報告）→ 実装 → GREEN（`成功 3 / 失敗 0`）。退行なし: `Tests.exe` 全体で **63/0**、`Verify.exe` のビルドも通過。証跡は `docs/testing/gui-accessible-names.tdd.md`。ブランチ `test/gui-accessible-names` に 5 コミット、**未 push**
+- **画面の読み上げ対応（`AccessibleName`）を TDD で追加** — 確認方法: RED（`成功 2 / 失敗 1`、10 部品すべてに名前が無いと報告）→ 実装 → GREEN（`成功 3 / 失敗 0`）。退行なし: `Tests.exe` 全体で **63/0**、`Verify.exe` のビルドも通過。証跡は `docs/testing/gui-accessible-names.tdd.md`
+- **`windows-latest` の CI で `FilterForm` を生成できる** — 確認方法: **これは未知数だと報告していた点で、PR #6 の `C# (Windows)` ジョブが pass して解消した**。ヘッドレス環境で落ちる場合に備えて代替案（当該テストを `Verify.exe` 側へ移す）を用意していたが、不要だった。アクセシビリティテスト 3 件は今後 CI で常時走る
+- **PR #5 / #6 / #7 をマージ** — 確認方法: 3 本とも CI 全ジョブ pass 後にマージ。`main` は `dca80ea`、ブランチは削除済み、作業ツリーに差分なし
+- **v0.1.0 を公開** — 確認方法: CI green（`dca80ea`）を確認してから注釈付きタグを作成し、GitHub Release を公開。https://github.com/bit2zero/DeepFilterTool/releases/tag/v0.1.0 。`Cargo.toml` が既に `0.1.0` だったため `deepfilter-tool --version` の出力とタグが一致する
+- **README にビルド方法と入手手順を追加** — 確認方法: PR #7 で「英語版が追随しているか」ジョブが pass（`README.md` と `README.en.md` を同時更新したため）
 
 ---
 
@@ -50,18 +54,20 @@ C# 以外の選択肢を検討した結果、**Rust で CLI 版のみ**を先に
 - **`.claude/safety-guard.ps1` の許可先を広げる編集** — 失敗理由: auto mode の分類器にブロックされた（`Blocked by classifier`）。セキュリティガードの緩和は分類器が止めるべき操作なので、設計通りの挙動。回避はしていない
 - **`~/.claude/session-data/`（`/save-session` の正規の保存先）へのセッション記録の書き込み** — 失敗理由: 直前に導入した safety-guard の freeze が、リポジトリ外への書き込みとして deny する。許可先を広げる編集も分類器にブロックされた。利用者の判断で **リポジトリ内（`docs/session-log/`）に置くことにした**。副作用として `/resume-session` はこのファイルを自動発見しない
 - **`docs/sessions/` への配置** — 失敗理由: `.gitignore` の 4 行目 `sessions/` が（先頭スラッシュなしのため）どの階層にもマッチし、意図せず無視された。`docs/session-log/` に変更した
+- **「2 本のブランチで `gui.md` が競合するのでマージ順序を決める必要がある」という私の予測** — 失敗理由: **単なる誤り**。`gui.md` は `test/gui-accessible-names` にしか含まれず、`docs/codemap-refresh` は `architecture.md` / `dependencies.md` / `session-log` のみだった。ファイルの重複はゼロで、順序の検討は不要だった。次回、競合を主張する前に `git diff --name-only` で実際に重複を確認すること
+- **リリースへのバイナリ添付** — 失敗理由: 失敗ではなく**意図的に見送った**。この環境では Linux / macOS 版をビルドできず、Windows 版だけを添えると偏る。加えて開発機で場当たりにビルドした実行ファイルには来歴の裏付けがなく、このプロジェクトの供給網方針と矛盾する
 
 ---
 
 ## What Has NOT Been Tried Yet
 
-- **`ANTHROPIC_API_KEY` を GitHub Secrets に登録する** — 未登録のため README 英語版の自動再生成は現在動かない（警告だけ出して素通りする設計）。PR での同期検査は動いている
-- **`main` のブランチ保護を有効にする**
-- **v0.1.0 リリースを作る**
+- **タグ push で 3 OS 分のバイナリをビルドして添付するリリースワークフロー** — GitHub Actions の artifact attestation を付ければ来歴を証明でき、「開発機ビルドは方針と矛盾する」という今回の見送り理由が解消する。これができれば v0.1.1 以降は配布物付きにでき、README の「配布物はまだありません」も差し替えられる。**利用者に提案済み・返答待ち**
+- **`ANTHROPIC_API_KEY` を GitHub Secrets に登録する** — 未登録のため README 英語版の自動再生成は現在動かない（警告だけ出して素通りする設計）。PR での同期検査は動いている。未登録の間、英語版は毎回手訳が必要（PR #7 で実際に手訳した）
+- **`main` のブランチ保護を有効にする** — v0.1.0 を出した今が区切りとして良い、と提案済み
 - **Node.js を導入して `/ecc:harness-audit` を走らせる** — `winget install --id OpenJS.NodeJS.LTS -e` で入る。スクリプトの依存は `fs`/`os`/`path` の Node 標準モジュールだけなので `npm install` は不要
-- **Windows / macOS の実機で CLI を動かす** — CI と型検査は 5 ターゲットすべて通っているが、実機実行は未確認
+- **Windows / macOS の実機デスクトップで人間が CLI を操作する** — CI は 3 OS すべてで実エンジンを起動した統合テストまで通しているが、人手での操作確認はしていない
+- **GUI の UI とロジックの結線を検査する** — pywinauto 等の UI Automation が必要で、第三者パッケージの導入を意味する。現状 `run.Click += …` を消してもテストは全部通る
 - **Linux での GUI** — 初期の要望に含まれていたが「まず Rust で CLI のみ」の判断で保留中
-- **safety-guard の許可先に `~/.claude/session-data` を追加する** — 利用者の承認待ち
 
 **やってはいけないこと:** `/ecc:orch-refine-code` が提案したリファクタリング（`filter_command` の分割、`engine_integration.rs` の分割など）は利用者が明示的に却下済み。着手しない。
 
@@ -78,15 +84,17 @@ C# 以外の選択肢を検討した結果、**Rust で CLI 版のみ**を先に
 | `cli/src/*_tests.rs` | 完了 | 単体テスト。`#[cfg(test)] #[path]` で本体に接続 |
 | `cli/tests/*.rs` + `common/mod.rs` | 完了 | 統合テスト 5 ファイル。パスは `&Path` のまま渡す（文字列化しない） |
 | `gui/{App,AudioCore,Tests,Verify}.cs` | 完了 | `git mv` でルートから `gui/` へ移動。EXE の出力先はルートのまま（`runtime/` の隣にある必要がある） |
-| `gui/App.cs` | 完了・未 push | 11 部品に `AccessibleName` を追加。ブランチ `test/gui-accessible-names` |
-| `gui/Tests.cs` | 完了・未 push | 782 行 63 件。`FormAccessibilityTests` を追加。同ブランチ |
-| `gui/build-tests.cmd` | 完了・未 push | `App.cs` を取り込み、`/main:TestRunner` を指定。同ブランチ |
-| `docs/testing/gui-accessible-names.tdd.md` | 完了・未 push | TDD の証跡。同ブランチ |
+| `gui/App.cs` | 完了・マージ済み | 11 部品に `AccessibleName` を追加（PR #6） |
+| `gui/Tests.cs` | 完了・マージ済み | 782 行 63 件。`FormAccessibilityTests` を追加（PR #6） |
+| `gui/build-tests.cmd` | 完了・マージ済み | `App.cs` を取り込み、`/main:TestRunner` と `[STAThread]` を指定（PR #6） |
+| `docs/testing/gui-accessible-names.tdd.md` | 完了・マージ済み | TDD の証跡（PR #6） |
+| `docs/session-log/…-session.md` | 更新中 | このファイル。ブランチ `docs/session-log-update` |
 | `gui/build*.cmd` | 完了 | ビルドスクリプト 3 本 |
 | `.github/workflows/ci.yml` | 完了 | 173 行 / 6 ジョブ。全部 green |
 | `.github/workflows/readme-translate.yml` | 完了・一部不活性 | PR での同期検査は動作。`main` への push での自動再生成は `ANTHROPIC_API_KEY` 待ち |
 | `.github/scripts/translate-readme.sh` | 完了・未実行 | `jq --rawfile` で組み立て。JSON 往復は Python で検証済みだが、API 実呼び出しは未実施 |
-| `README.md` / `README.en.md` | 完了 | 日本語が正本。相互リンク済み |
+| `README.md` / `README.en.md` | 完了 | 日本語が正本。相互リンク済み。「入手する」節（ビルド手順）を PR #7 で追加 |
+| GitHub Release `v0.1.0` | 公開済み | `dca80ea` にタグ。**バイナリ添付なし**（下の Decisions 参照）。ソース書庫のみ自動生成 |
 | `docs/*.md`, `docs/CODEMAPS/*.md` | 完了 | CLI / MEASUREMENT / FILENAMES / SECURITY / VERIFICATION / CONTRIBUTING、コードマップ 5 本 |
 | `.claude/settings.json` | 完了・git 管理外 | PreToolUse フック 1 本 |
 | `.claude/safety-guard.ps1` | 完了・git 管理外 | 許可先の追加は分類器にブロックされて未反映 |
@@ -113,29 +121,45 @@ C# 以外の選択肢を検討した結果、**Rust で CLI 版のみ**を先に
 - **`Verify.exe` を CI に載せない** — 理由: 利用者の判断。実エンジンの導入が必要で実行時間も長い。GUI の end-to-end 経路は手元実行のみで検証する
 - **画面の読み上げ対応テストは `Tests.exe` 側に置く** — 理由: CI が実際に走らせている唯一の C# テストであり、フォームを生成するだけならエンジンが要らないため。`Verify.exe` 側に置くと CI で走らない
 - **`AccessibleName` に表示文字列をそのまま使わない部品がある** — 理由: 「強めの除去（ポストフィルター）」は読み上げが冗長。数値入力は表示文字列が値そのもの（`"100"`）で名前になっていない
+- **v0.1.0 にバイナリを添付しない（ソースのみ）** — 理由: このプロジェクトは「取得物を版・URL・バイト数・SHA-256 で固定し、配置前に照合する」ことを設計の背骨にしている。開発機で場当たりにビルドした実行ファイルには来歴の裏付けがなく、その方針と矛盾する。加えてこの環境では Linux / macOS 版を作れず、Windows だけ添えると偏る。**代替として、タグ push で CI がビルドし attestation を付けるワークフローを提案済み**
+- **リリースノートに「検証していないこと」を明記する** — 理由: 0.1.0 で伏せると、後から見つかったときに信用を落とす。UI とロジックの結線が未検査であること、`Verify.exe` が CI 未実行であること、C# のカバレッジが測れないこと、実機での人手確認がないことを列挙した
+- **セッション記録は 1 ファイルを更新し、保存のたびに新規作成しない** — 理由: 同一セッションの記録が複数に分かれると、どれが正かが曖昧になる。スキルの「セッションごとに 1 ファイル」は別セッション間の話として解釈した
 
 ---
 
 ## Blockers & Open Questions
 
+- **リリースワークフロー（バイナリ + attestation）を作るか** — 提案済み・返答待ち。これが決まらないと v0.1.x は配布物なしのまま
+- **`ANTHROPIC_API_KEY` を Secrets に登録するか** — 未登録の間、英語版の自動再生成は不活性で、README を直すたび手訳が必要
+- **`main` のブランチ保護を有効にするか** — 未決
 - **Node.js が未導入** — `/ecc:harness-audit` が動かせない。導入するかは利用者の判断待ち
-- **セッション記録を正規の場所に置けない** — `~/.claude/session-data/` は safety-guard の freeze の範囲外。許可先に追加するか、別の場所に置くかの判断待ち。現在の内容は scratchpad にある
-- **`ANTHROPIC_API_KEY` を Secrets に登録するか** — 未登録の間、英語版の自動再生成は不活性
-- **`main` のブランチ保護と v0.1.0 リリース** — どちらも未着手・未決
-- **Windows / macOS 実機での CLI 動作** — CI では通っているが実機未確認
+- **Windows / macOS 実機での人手確認** — CI は 3 OS で実エンジンまで通しているが、人が操作した確認はない
+
+解消済み（記録として残す）:
+
+- ~~セッション記録を正規の場所に置けない~~ → 利用者の判断でリポジトリ内（`docs/session-log/`）に置くことにした
+- ~~`windows-latest` で `FilterForm` が生成できるか不明~~ → PR #6 の CI で pass を確認
+- ~~v0.1.0 リリース~~ → 公開済み
 
 ---
 
 ## Exact Next Step
 
-**このファイル自体はまだコミットされていない。** 公開リポジトリなので、コミットすると内容が公開される。コミットするか、`.gitignore` に加えて手元だけに留めるかを決める。
+**リリースワークフローを作るかどうかを決める。** これが最も影響が大きい。
 
-そのうえで、残っている未決事項のうち影響が大きい順に:
+v0.1.0 はソースのみで公開したため、利用者は自分でビルドしないと使えない。タグ push で `.github/workflows/release.yml` が 3 OS 分をビルドし、GitHub Actions の artifact attestation を付けて添付すれば、「開発機ビルドは来歴の裏付けがない」という今回の見送り理由が解消する。実装するなら:
 
-1. **`test/gui-accessible-names` ブランチを push して PR にするか決める** — `windows-latest` で `FilterForm` の生成が通るかは、push して CI が回るまで未検証。落ちた場合は当該テストを `Verify.exe` 側へ移すのが対処
-2. `ANTHROPIC_API_KEY` を GitHub Secrets に登録するか決める
-3. `main` のブランチ保護を有効にするか決める
-4. v0.1.0 リリースを作るか決める
+- `windows-latest` で `cli\build.cmd` と `gui\build.cmd`
+- `ubuntu-latest` で musl ターゲット（完全静的）
+- `macos-latest` で x86_64 と aarch64
+- `actions/attest-build-provenance` を 40 桁コミット SHA で固定（既存の方針に合わせる）
+- 完成後、README の「ビルド済みの配布物はまだありません」を差し替える
+
+そのうえで、残りの未決事項:
+
+1. `ANTHROPIC_API_KEY` を GitHub Secrets に登録するか決める
+2. `main` のブランチ保護を有効にするか決める（v0.1.0 を出した今が区切りとして良い）
+3. Node.js を導入して `/ecc:harness-audit` を走らせるか決める
 
 ---
 
