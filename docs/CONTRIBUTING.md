@@ -47,7 +47,7 @@ cargo run --release -- check
 
 未導入でもテストは失敗せず、理由を表示して該当項目を飛ばします。
 
-<!-- AUTO-GENERATED: ビルドスクリプトと .github/workflows/ci.yml から生成。手で編集しないでください -->
+<!-- AUTO-GENERATED: ビルドスクリプト、.github/scripts、.github/workflows、および cli/src・cli/tests の参照箇所から生成。手で編集しないでください -->
 
 ## コマンド一覧
 
@@ -75,9 +75,15 @@ cargo run --release -- check
 
 `Tests.exe` は引数に文字列を渡すと名前で絞り込めます（例: `Tests.exe Read_`）。
 
+### 保守用
+
+| コマンド | 内容 |
+|---|---|
+| `.github/scripts/translate-readme.sh` | `README.md` から `README.en.md` を再生成。`ANTHROPIC_API_KEY` が必要 |
+
 ## 環境変数
 
-`cli/src` と `cli/tests` の実際の参照箇所から抽出しています。
+`cli/src`、`cli/tests`、`.github/scripts`、`.github/workflows` の実際の参照箇所から抽出しています。
 
 ### 実行時
 
@@ -93,6 +99,12 @@ cargo run --release -- check
 | `DEEPFILTER_NETWORK_TESTS` | いいえ | 設定すると、公式配布物を実際に取得する検査も走ります。既定では飛ばします | `1` |
 | `DEEPFILTER_CLEAN` | いいえ | 効果測定に使う雑音なし音声。既定は `samples/clean.wav` | `/path/to/clean.wav` |
 | `DEEPFILTER_NOISY` | いいえ | 効果測定に使う雑音入り音声。既定は `samples/noisy.wav` | `/path/to/noisy.wav` |
+
+### 保守作業時
+
+| 変数 | 必須 | 内容 | 例 |
+|---|---|---|---|
+| `ANTHROPIC_API_KEY` | 翻訳時のみ | `README.en.md` の再生成に使う。ビルドとテストには不要。CI では Secrets から読み、未設定なら自動生成をせず素通りする | `sk-ant-…` |
 
 `PATH` と `PATHEXT` は取得ツール（curl / wget / powershell）の探索に読み取るだけで、設定は不要です。
 
@@ -142,7 +154,7 @@ cargo test --all-targets
 Windowsで C# を触った場合は追加で:
 
 ```
-guibuild-tests.cmd && Tests.exe
+gui\build-tests.cmd && Tests.exe
 ```
 
 - [ ] `cargo fmt --check` が差分なし
