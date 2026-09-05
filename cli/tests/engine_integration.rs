@@ -4,159 +4,29 @@
 //! 未導入の環境では理由を表示して何も検査せずに終了します。
 //! 導入は `deepfilter-tool setup` で行えます。
 
+mod common;
+
+use common::{engine_file, model_file, parse_wav, repo_root, run_in, skip_unless_ready, BIN};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-const BIN: &str = env!("CARGO_BIN_EXE_deepfilter-tool");
 const FRAMES: usize = 48_001;
 
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("cli/ の親フォルダー")
-        .to_path_buf()
-}
-
-fn runtime_ready(root: &Path) -> bool {
-    let engine = root.join("runtime").join(if cfg!(windows) {
-        "deep-filter.exe"
-    } else {
-        "deep-filter"
-    });
-    engine.is_file()
-        && root
-            .join("runtime")
-            .join("DeepFilterNet3_onnx.tar.gz")
-            .is_file()
-}
-
 fn work_dir(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("deepfilter-it-{}-{}", std::process::id(), name));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("作業フォルダー作成");
-    dir
+    common::work_dir("it", name)
 }
 
-/// 決定的な擬似乱数ノイズと 180 Hz の正弦波を重ねた検査用 WAV を書く。
 fn write_test_wav(path: &Path, channels: u16) {
-    let align = channels as usize * 2;
-    let mut data = vec![0u8; FRAMES * align];
-    let mut seed: u32 = 42;
-    for frame in 0..FRAMES {
-        seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-        let noise = (seed >> 16) as i32 - 32_768;
-        let tone =
-            (2_500.0 * (frame as f64 * 2.0 * std::f64::consts::PI * 180.0 / 48_000.0).sin()) as i32;
-        let value = ((noise * 1_800 / 32_768) + tone).clamp(-32_768, 32_767) as i16;
-        for ch in 0..channels as usize {
-            let at = frame * align + ch * 2;
-            data[at..at + 2].copy_from_slice(&value.to_le_bytes());
-        }
-    }
-
-    let count = data.len();
-    let mut bytes = Vec::with_capacity(count + 44);
-    bytes.extend_from_slice(b"RIFF");
-    bytes.extend_from_slice(&((36 + count) as u32).to_le_bytes());
-    bytes.extend_from_slice(b"WAVEfmt ");
-    bytes.extend_from_slice(&16u32.to_le_bytes());
-    bytes.extend_from_slice(&1u16.to_le_bytes());
-    bytes.extend_from_slice(&channels.to_le_bytes());
-    bytes.extend_from_slice(&48_000u32.to_le_bytes());
-    bytes.extend_from_slice(&(48_000 * align as u32).to_le_bytes());
-    bytes.extend_from_slice(&(align as u16).to_le_bytes());
-    bytes.extend_from_slice(&16u16.to_le_bytes());
-    bytes.extend_from_slice(b"data");
-    bytes.extend_from_slice(&(count as u32).to_le_bytes());
-    bytes.extend_from_slice(&data);
-    std::fs::write(path, bytes).expect("検査用 WAV の書き出し");
+    common::write_test_wav(path, channels, FRAMES);
 }
 
-struct Parsed {
-    channels: u16,
-    rate: u32,
-    bits: u16,
-    data: Vec<u8>,
-}
-
-/// 検査用の最小 WAV 読み取り。本体の実装とは独立に書いて相互検証にする。
-fn parse_wav(path: &Path) -> Parsed {
-    let bytes = std::fs::read(path).expect("出力 WAV の読み取り");
-    assert_eq!(&bytes[0..4], b"RIFF", "RIFF ヘッダー");
-    assert_eq!(&bytes[8..12], b"WAVE", "WAVE ヘッダー");
-    let mut at = 12;
-    let (mut channels, mut rate, mut bits) = (0u16, 0u32, 0u16);
-    let mut data = Vec::new();
-    while at + 8 <= bytes.len() {
-        let id = &bytes[at..at + 4];
-        let n = u32::from_le_bytes(bytes[at + 4..at + 8].try_into().unwrap()) as usize;
-        let body = at + 8;
-        if id == b"fmt " {
-            channels = u16::from_le_bytes(bytes[body + 2..body + 4].try_into().unwrap());
-            rate = u32::from_le_bytes(bytes[body + 4..body + 8].try_into().unwrap());
-            bits = u16::from_le_bytes(bytes[body + 14..body + 16].try_into().unwrap());
-        } else if id == b"data" {
-            data = bytes[body..body + n].to_vec();
-        }
-        at = body + n + (n % 2);
-    }
-    Parsed {
-        channels,
-        rate,
-        bits,
-        data,
-    }
-}
-
-fn engine_file() -> PathBuf {
-    repo_root().join("runtime").join(if cfg!(windows) {
-        "deep-filter.exe"
-    } else {
-        "deep-filter"
-    })
-}
-
-/// テストごとに独立した作業フォルダーを DEEPFILTER_HOME にする。
-///
-/// テストは並列に走るため、sessions/ を共有すると数え間違える。エンジンとモデルは
-/// リポジトリの runtime/ を明示的に指す。呼び出し側の引数を後ろに置くので、
-/// テストが自分で --engine を渡した場合はそちらが優先される。
-fn run_in(home: &Path, args: &[&str]) -> Output {
-    let engine = engine_file();
-    let model = repo_root()
-        .join("runtime")
-        .join("DeepFilterNet3_onnx.tar.gz");
-    let mut all: Vec<&str> = vec![
-        "--engine",
-        engine.to_str().unwrap(),
-        "--model",
-        model.to_str().unwrap(),
-    ];
-    all.extend_from_slice(args);
-    Command::new(BIN)
-        .env("DEEPFILTER_HOME", home)
-        .args(&all)
-        .output()
-        .expect("deepfilter-tool の起動")
-}
-
+/// DEEPFILTER_HOME をリポジトリ直下にして起動する。サブコマンドの検査に使う。
 fn run(args: &[&str]) -> Output {
-    Command::new(BIN)
-        .env("DEEPFILTER_HOME", repo_root())
-        .args(args)
-        .output()
-        .expect("deepfilter-tool の起動")
+    common::run_with_home(&repo_root(), args)
 }
 
-fn skip_unless_ready() -> bool {
-    if runtime_ready(&repo_root()) {
-        return false;
-    }
-    eprintln!(
-        "スキップ: runtime/ に公式エンジンとモデルがありません。\
-         `deepfilter-tool setup` で導入すると実エンジン検証を実行します。"
-    );
-    true
+fn model_file_path() -> PathBuf {
+    model_file()
 }
 
 #[test]
@@ -1109,12 +979,6 @@ fn model_or_placeholder(dir: &Path) -> PathBuf {
     let placeholder = dir.join("model.tar.gz");
     std::fs::write(&placeholder, b"placeholder").unwrap();
     placeholder
-}
-
-fn model_file_path() -> PathBuf {
-    repo_root()
-        .join("runtime")
-        .join("DeepFilterNet3_onnx.tar.gz")
 }
 
 #[test]

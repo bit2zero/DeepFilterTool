@@ -1,78 +1,21 @@
 //! `--debug` の出力内容を、別プロセスとして起動して確認する。
 
+mod common;
+
+use common::{engine_file, model_file, repo_root, skip_unless_ready, write_test_wav, BIN};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-const BIN: &str = env!("CARGO_BIN_EXE_deepfilter-tool");
 const FRAMES: usize = 4_800;
 
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("cli/ の親フォルダー")
-        .to_path_buf()
-}
-
-fn engine_file() -> PathBuf {
-    repo_root().join("runtime").join(if cfg!(windows) {
-        "deep-filter.exe"
-    } else {
-        "deep-filter"
-    })
-}
-
-fn model_file() -> PathBuf {
-    repo_root()
-        .join("runtime")
-        .join("DeepFilterNet3_onnx.tar.gz")
-}
-
-fn skip_unless_ready() -> bool {
-    if engine_file().is_file() && model_file().is_file() {
-        return false;
-    }
-    eprintln!("スキップ: runtime/ が未導入です。");
-    true
-}
-
 fn work_dir(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("deepfilter-dbg-{}-{}", std::process::id(), name));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("作業フォルダー作成");
-    dir
+    common::work_dir("dbg", name)
 }
 
-fn write_test_wav(path: &Path) {
-    let mut data = vec![0u8; FRAMES * 2];
-    let mut seed: u32 = 11;
-    for frame in 0..FRAMES {
-        seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-        let noise = ((seed >> 16) as i32 - 32_768) / 20;
-        let tone =
-            (2_000.0 * (frame as f64 * 2.0 * std::f64::consts::PI * 220.0 / 48_000.0).sin()) as i32;
-        let value = (noise + tone).clamp(-32_768, 32_767) as i16;
-        data[frame * 2..frame * 2 + 2].copy_from_slice(&value.to_le_bytes());
-    }
-    let mut bytes = Vec::new();
-    bytes.extend_from_slice(b"RIFF");
-    bytes.extend_from_slice(&((36 + data.len()) as u32).to_le_bytes());
-    bytes.extend_from_slice(b"WAVEfmt ");
-    bytes.extend_from_slice(&16u32.to_le_bytes());
-    bytes.extend_from_slice(&1u16.to_le_bytes());
-    bytes.extend_from_slice(&1u16.to_le_bytes());
-    bytes.extend_from_slice(&48_000u32.to_le_bytes());
-    bytes.extend_from_slice(&96_000u32.to_le_bytes());
-    bytes.extend_from_slice(&2u16.to_le_bytes());
-    bytes.extend_from_slice(&16u16.to_le_bytes());
-    bytes.extend_from_slice(b"data");
-    bytes.extend_from_slice(&(data.len() as u32).to_le_bytes());
-    bytes.extend_from_slice(&data);
-    std::fs::write(path, bytes).expect("検査用 WAV の書き出し");
-}
-
+/// 1 回処理して、その出力と生成物の場所を返す。
 fn filter(dir: &Path, extra: &[&str], debug_env: Option<&str>) -> (Output, PathBuf) {
     let input = dir.join("in.wav");
-    write_test_wav(&input);
+    write_test_wav(&input, 1, FRAMES);
     let output = dir.join("out.wav");
     let mut command = Command::new(BIN);
     command
@@ -233,7 +176,7 @@ fn debug_keeps_the_work_folder_for_inspection() {
 fn debug_reports_why_a_failure_happened() {
     let dir = work_dir("failure");
     let input = dir.join("in.wav");
-    write_test_wav(&input);
+    write_test_wav(&input, 1, FRAMES);
 
     let out = Command::new(BIN)
         .env("DEEPFILTER_HOME", &dir)

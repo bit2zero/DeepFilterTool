@@ -3,7 +3,7 @@
 //! ノイズのない音声（clean）と、それに雑音を重ねた音声（noisy）の対を用意し、
 //! noisy を処理した結果が clean にどれだけ近づいたかを数値で確かめる。
 //!
-//! 音声そのものはリポジトリに含めないため、次のいずれかに置いてください。
+//! 音声は次のいずれかから読み込みます。
 //!
 //! 1. リポジトリ直下の `samples/clean.wav` と `samples/noisy.wav`
 //! 2. 環境変数 `DEEPFILTER_CLEAN` と `DEEPFILTER_NOISY` で指すファイル
@@ -13,30 +13,13 @@
 //! 2つの音声は 48 kHz モノラル PCM16 で、**同じ長さかつ時間が揃っている**
 //! 必要があります（noisy = clean + 雑音）。ずれていると測定になりません。
 
+mod common;
+
+use common::{filter_paths, read_mono_pcm16, repo_root, runtime_ready};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
-const BIN: &str = env!("CARGO_BIN_EXE_deepfilter-tool");
-
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("cli/ の親フォルダー")
-        .to_path_buf()
-}
-
-fn engine_file() -> PathBuf {
-    repo_root().join("runtime").join(if cfg!(windows) {
-        "deep-filter.exe"
-    } else {
-        "deep-filter"
-    })
-}
-
-fn model_file() -> PathBuf {
-    repo_root()
-        .join("runtime")
-        .join("DeepFilterNet3_onnx.tar.gz")
+fn work_dir(name: &str) -> PathBuf {
+    common::work_dir("snr", name)
 }
 
 /// 検査に使う音声の対。見つからなければ None。
@@ -54,7 +37,7 @@ fn reference_pair() -> Option<(PathBuf, PathBuf)> {
 }
 
 fn skip_unless_ready() -> Option<(PathBuf, PathBuf)> {
-    if !engine_file().is_file() || !model_file().is_file() {
+    if !runtime_ready() {
         eprintln!("スキップ: runtime/ が未導入です。`deepfilter-tool setup` で導入してください。");
         return None;
     }
@@ -69,47 +52,6 @@ fn skip_unless_ready() -> Option<(PathBuf, PathBuf)> {
             None
         }
     }
-}
-
-fn work_dir(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("deepfilter-snr-{}-{}", std::process::id(), name));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("作業フォルダー作成");
-    dir
-}
-
-/// 48 kHz モノラル PCM16 の WAV からサンプル列を取り出す。
-fn read_mono_pcm16(path: &Path) -> Vec<i16> {
-    let bytes =
-        std::fs::read(path).unwrap_or_else(|e| panic!("{} を読めません: {}", path.display(), e));
-    assert_eq!(&bytes[0..4], b"RIFF", "{} が RIFF でない", path.display());
-    assert_eq!(&bytes[8..12], b"WAVE", "{} が WAVE でない", path.display());
-
-    let mut at = 12usize;
-    let (mut channels, mut rate, mut bits) = (0u16, 0u32, 0u16);
-    let mut samples: Option<Vec<i16>> = None;
-    while at + 8 <= bytes.len() {
-        let id = &bytes[at..at + 4];
-        let n = u32::from_le_bytes(bytes[at + 4..at + 8].try_into().unwrap()) as usize;
-        let body = at + 8;
-        if id == b"fmt " {
-            channels = u16::from_le_bytes(bytes[body + 2..body + 4].try_into().unwrap());
-            rate = u32::from_le_bytes(bytes[body + 4..body + 8].try_into().unwrap());
-            bits = u16::from_le_bytes(bytes[body + 14..body + 16].try_into().unwrap());
-        } else if id == b"data" {
-            samples = Some(
-                bytes[body..body + n]
-                    .chunks_exact(2)
-                    .map(|c| i16::from_le_bytes([c[0], c[1]]))
-                    .collect(),
-            );
-        }
-        at = body + n + (n % 2);
-    }
-    assert_eq!(channels, 1, "{} はモノラルにしてください", path.display());
-    assert_eq!(rate, 48_000, "{} は 48 kHz にしてください", path.display());
-    assert_eq!(bits, 16, "{} は PCM 16bit にしてください", path.display());
-    samples.unwrap_or_else(|| panic!("{} に data がない", path.display()))
 }
 
 fn energy(samples: &[i16]) -> f64 {
@@ -174,19 +116,7 @@ fn best_offset(a: &[i16], b: &[i16], search: i64) -> i64 {
 }
 
 fn filter(dir: &Path, input: &Path, output: &Path, extra: &[&str]) {
-    let out = Command::new(BIN)
-        .env("DEEPFILTER_HOME", dir)
-        .arg("--engine")
-        .arg(engine_file())
-        .arg("--model")
-        .arg(model_file())
-        .arg(input)
-        .arg("-o")
-        .arg(output)
-        .args(extra)
-        .arg("-q")
-        .output()
-        .expect("deepfilter-tool の起動");
+    let out = filter_paths(dir, input, output, extra);
     assert!(
         out.status.success(),
         "処理に失敗しました: {}",

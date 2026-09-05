@@ -4,110 +4,31 @@
 //! 空白や記号、日本語のフォルダー名、そして UTF-8 ではないファイル名まで扱えることを、
 //! 公式エンジンを実際に起動して確認する。
 
+mod common;
+
+use common::{engine_file, filter_paths, model_file, skip_unless_ready, write_test_wav, BIN};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-const BIN: &str = env!("CARGO_BIN_EXE_deepfilter-tool");
 const FRAMES: usize = 4_800;
 
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("cli/ の親フォルダー")
-        .to_path_buf()
-}
-
-fn engine_file() -> PathBuf {
-    repo_root().join("runtime").join(if cfg!(windows) {
-        "deep-filter.exe"
-    } else {
-        "deep-filter"
-    })
-}
-
-fn model_file() -> PathBuf {
-    repo_root()
-        .join("runtime")
-        .join("DeepFilterNet3_onnx.tar.gz")
-}
-
-fn skip_unless_ready() -> bool {
-    if engine_file().is_file() && model_file().is_file() {
-        return false;
-    }
-    eprintln!("スキップ: runtime/ が未導入です。`deepfilter-tool setup` で導入してください。");
-    true
-}
-
 fn work_dir(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("deepfilter-name-{}-{}", std::process::id(), name));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("作業フォルダー作成");
-    dir
+    common::work_dir("name", name)
 }
 
-fn write_test_wav(path: &Path) {
-    let mut data = vec![0u8; FRAMES * 2];
-    let mut seed: u32 = 7;
-    for frame in 0..FRAMES {
-        seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-        let noise = ((seed >> 16) as i32 - 32_768) / 20;
-        let tone =
-            (2_000.0 * (frame as f64 * 2.0 * std::f64::consts::PI * 220.0 / 48_000.0).sin()) as i32;
-        let value = (noise + tone).clamp(-32_768, 32_767) as i16;
-        data[frame * 2..frame * 2 + 2].copy_from_slice(&value.to_le_bytes());
-    }
-    let mut bytes = Vec::new();
-    bytes.extend_from_slice(b"RIFF");
-    bytes.extend_from_slice(&((36 + data.len()) as u32).to_le_bytes());
-    bytes.extend_from_slice(b"WAVEfmt ");
-    bytes.extend_from_slice(&16u32.to_le_bytes());
-    bytes.extend_from_slice(&1u16.to_le_bytes());
-    bytes.extend_from_slice(&1u16.to_le_bytes());
-    bytes.extend_from_slice(&48_000u32.to_le_bytes());
-    bytes.extend_from_slice(&96_000u32.to_le_bytes());
-    bytes.extend_from_slice(&2u16.to_le_bytes());
-    bytes.extend_from_slice(&16u16.to_le_bytes());
-    bytes.extend_from_slice(b"data");
-    bytes.extend_from_slice(&(data.len() as u32).to_le_bytes());
-    bytes.extend_from_slice(&data);
-    std::fs::write(path, bytes).expect("検査用 WAV の書き出し");
+fn write_test_wav_mono(path: &Path) {
+    write_test_wav(path, 1, FRAMES);
 }
 
 /// 出力が 48 kHz / モノラル / PCM16 で、元と同じ長さになっているか。
 fn assert_is_clean_wav(path: &Path) {
-    let bytes = std::fs::read(path).expect("出力の読み取り");
-    assert_eq!(&bytes[0..4], b"RIFF", "RIFF で始まる");
-    assert_eq!(&bytes[8..12], b"WAVE", "WAVE である");
-    assert_eq!(
-        u32::from_le_bytes(bytes[24..28].try_into().unwrap()),
-        48_000,
-        "48 kHz"
-    );
-    assert_eq!(
-        u16::from_le_bytes(bytes[34..36].try_into().unwrap()),
-        16,
-        "PCM 16bit"
-    );
-    assert_eq!(bytes.len(), 44 + FRAMES * 2, "長さが保たれている");
+    common::assert_is_clean_wav(path, 1, FRAMES);
 }
 
 fn run_with_home(home: &Path, input: &Path, output: &Path) -> Output {
-    Command::new(BIN)
-        .env("DEEPFILTER_HOME", home)
-        .arg("--engine")
-        .arg(engine_file())
-        .arg("--model")
-        .arg(model_file())
-        .arg(input)
-        .arg("-o")
-        .arg(output)
-        .arg("-q")
-        .output()
-        .expect("deepfilter-tool の起動")
+    filter_paths(home, input, output, &[])
 }
 
-/// さまざまな表記のファイル名を、実エンジンを通して処理する。
 #[test]
 fn handles_japanese_and_other_non_ascii_file_names() {
     if skip_unless_ready() {
@@ -133,7 +54,7 @@ fn handles_japanese_and_other_non_ascii_file_names() {
 
     for (label, name) in names {
         let input = dir.join(name);
-        write_test_wav(&input);
+        write_test_wav_mono(&input);
         assert!(input.is_file(), "{}: 入力を作れる", label);
         let before = std::fs::read(&input).expect("入力の読み取り");
 
@@ -168,7 +89,7 @@ fn default_output_name_keeps_the_japanese_stem() {
     }
     let dir = work_dir("defaultname");
     let input = dir.join("会議の録音.wav");
-    write_test_wav(&input);
+    write_test_wav_mono(&input);
 
     let out = Command::new(BIN)
         .env("DEEPFILTER_HOME", &dir)
@@ -204,7 +125,7 @@ fn handles_japanese_directory_names_including_the_work_folder() {
     std::fs::create_dir_all(&nested).expect("日本語フォルダーの作成");
 
     let input = nested.join("議事録.wav");
-    write_test_wav(&input);
+    write_test_wav_mono(&input);
     let output = nested.join("議事録_きれい.wav");
 
     // DEEPFILTER_HOME が日本語なので、sessions/ も日本語パスの下に作られ、
@@ -231,7 +152,7 @@ fn keeps_a_session_under_a_japanese_home() {
     let home = base.join("日本語のホーム");
     std::fs::create_dir_all(&home).unwrap();
     let input = home.join("入力音声.wav");
-    write_test_wav(&input);
+    write_test_wav_mono(&input);
 
     let out = Command::new(BIN)
         .env("DEEPFILTER_HOME", &home)
@@ -288,7 +209,7 @@ fn handles_file_names_that_are_not_valid_utf8() {
     // Shift_JIS の「日本語」+ ".wav"。UTF-8 としては不正なバイト列。
     let raw = b"\x93\xfa\x96\x7b\x8c\xea.wav";
     let input = dir.join(OsStr::from_bytes(raw));
-    write_test_wav(&input);
+    write_test_wav_mono(&input);
     assert!(input.is_file(), "UTF-8 でない名前でファイルを作れる");
 
     let output = dir.join(OsStr::from_bytes(b"\x8c\x8b\x89\xca.wav"));
@@ -303,7 +224,7 @@ fn handles_file_names_that_are_not_valid_utf8() {
 
     // 既定の出力名も、バイト列のまま組み立てられること。
     let plain = dir.join(OsStr::from_bytes(b"\x93\xfa\x96\x7b.wav"));
-    write_test_wav(&plain);
+    write_test_wav_mono(&plain);
     let out = Command::new(BIN)
         .env("DEEPFILTER_HOME", &dir)
         .arg("--engine")
@@ -381,7 +302,7 @@ fn still_refuses_to_write_over_a_japanese_input() {
     }
     let dir = work_dir("selfjp");
     let input = dir.join("上書き禁止.wav");
-    write_test_wav(&input);
+    write_test_wav_mono(&input);
     let before = std::fs::read(&input).unwrap();
 
     let out = run_with_home(&dir, &input, &input);
@@ -401,7 +322,7 @@ fn accepts_every_spelling_of_a_multibyte_path() {
     let nested = base.join("録音").join("素材");
     std::fs::create_dir_all(&nested).unwrap();
     let input = nested.join("音声.wav");
-    write_test_wav(&input);
+    write_test_wav_mono(&input);
 
     let forms: Vec<PathBuf> = vec![
         input.clone(),                                           // 絶対パス
@@ -432,7 +353,7 @@ fn detects_the_input_even_when_spelled_differently() {
     }
     let dir = work_dir("alias");
     let input = dir.join("元の音声.wav");
-    write_test_wav(&input);
+    write_test_wav_mono(&input);
     let before = std::fs::read(&input).unwrap();
 
     let alias = dir.join(".").join("元の音声.wav");
@@ -459,7 +380,7 @@ fn refuses_output_names_that_break_on_windows() {
     }
     let dir = work_dir("badnames");
     let input = dir.join("入力.wav");
-    write_test_wav(&input);
+    write_test_wav_mono(&input);
 
     for (name, expected) in [
         ("NUL", "予約名"),
