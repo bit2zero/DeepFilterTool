@@ -1,0 +1,23 @@
+[package]
+name = "deepfilter-tool"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77"
+description = "DeepFilterNet3 公式CLIを用いたクロスプラットフォーム音声ノイズ除去ツール"
+license = "MIT"
+publish = false
+authors = ["bit2zero"]
+readme = "../README.md"
+
+# 外部クレートは使用しません。標準ライブラリのみで完結します。
+[dependencies]
+
+[[bin]]
+name = "deepfilter-tool"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

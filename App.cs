@@ -1,3 +1,5 @@
+// Copyright (c) 2026 bit2zero
+// MIT License. See LICENSE and NOTICE.md in the repository root.
 using System;
 using System.IO;
 using System.Drawing;

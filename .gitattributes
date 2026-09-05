@@ -1,0 +1,16 @@
+# 既定は LF で保存し、チェックアウト時も LF のままにする。
+# CRLF のシェルスクリプトは Linux/macOS で実行できず、GitHub Actions の
+# run: ブロックも壊れるため、環境ごとの自動変換に任せない。
+* text=auto eol=lf
+
+# Windows のバッチファイルは CRLF でないと正しく動かないことがある。
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# 変換してはいけないもの
+*.wav binary
+*.exe binary
+*.dll binary
+*.png binary
+*.tar.gz binary

@@ -15,3 +15,10 @@ runtime/*
 *.key
 *.pem
 .vs/
+
+# Rust CLI のビルド成果物
+cli/target/
+
+# C# テストの成果物（*.exe は既に無視対象。念のため明示）
+Tests.exe
+
