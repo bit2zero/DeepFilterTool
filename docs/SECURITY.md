@@ -64,3 +64,37 @@ CIの `supply-chain` ジョブが、`Cargo.lock` のパッケージ数が1でな
 
 ---
 
+
+## 依存の脆弱性チェック
+
+最終確認日: 2026-09-05
+
+| 対象 | 結果 |
+|---|---|
+| Rust クレート | **0 件**（`Cargo.lock` のパッケージ数 1 = 自分自身のみ）。RustSec / cargo-audit の検査対象がない |
+| npm パッケージ | **なし**（`package.json` が存在しない） |
+| NuGet パッケージ | **なし**（Windows 同梱の .NET Framework のみ） |
+| `unsafe` ブロック | **0 件** |
+| DeepFilterNet v0.5.6 | 最新版。公開セキュリティ勧告 **0 件**（GitHub Advisory DB を `deepfilternet` / `deep-filter` で横断検索） |
+| `actions/checkout` | 最新の v7.0.1 に相当するコミット SHA で固定 |
+| Rust ツールチェーン | CI は stable（1.98.1）。標準ライブラリに該当する勧告なし |
+
+**パッケージレジストリ経由の攻撃面がありません。** 依存が増えれば CI の `supply-chain` ジョブが失敗するため、この状態は仕組みで維持されます。
+
+### プロセス起動に関する確認
+
+Windows の標準ライブラリでは、バッチファイル（`.bat` / `.cmd`）を起動する際の引数エスケープに関する脆弱性が過去に報告されています。本ソフトウェアが起動するのは以下だけで、**バッチファイルは起動しません**。
+
+| 起動対象 | 解決方法 |
+|---|---|
+| `deep-filter` | `runtime/` 配下の実行ファイル |
+| `curl` / `wget` / `powershell` | `which` で解決した絶対パス |
+| `xattr`（macOS のみ） | 同上 |
+
+引数はシェルを介さず個別の値として渡します。唯一の例外である PowerShell 取得経路は、単引用符を二重化してエスケープします。
+
+### 定期的に確認すべきこと
+
+- DeepFilterNet に新しい版が出ていないか（`cli/src/assets.rs` の固定情報を更新し、`deepfilter-tool manifest > runtime/manifest.json` で再生成する）
+- `actions/checkout` の新しい版が出ていないか（コミット SHA で固定し直す）
+- GitHub のシークレットスキャンのアラート

@@ -1,4 +1,4 @@
-<!-- Generated: 2026-09-05 | Files scanned: 4 (*.cs) | Token estimate: ~700 -->
+<!-- Generated: 2026-09-05 | Files scanned: 4 (gui/*.cs) | Token estimate: ~700 -->
 
 # GUI（C# / WinForms）の内部
 

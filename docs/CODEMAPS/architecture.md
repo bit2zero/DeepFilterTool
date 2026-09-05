@@ -1,4 +1,4 @@
-<!-- Generated: 2026-09-05 | Files scanned: 42 | Token estimate: ~750 -->
+<!-- Generated: 2026-09-05 | Files scanned: 53 | Token estimate: ~800 -->
 
 # 全体構成
 
