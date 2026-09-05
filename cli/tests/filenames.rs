@@ -209,6 +209,22 @@ fn handles_file_names_that_are_not_valid_utf8() {
     // Shift_JIS の「日本語」+ ".wav"。UTF-8 としては不正なバイト列。
     let raw = b"\x93\xfa\x96\x7b\x8c\xea.wav";
     let input = dir.join(OsStr::from_bytes(raw));
+
+    // macOS の APFS のように、ファイル名として妥当な UTF-8 しか受け付けない
+    // ファイルシステムでは、この名前のファイルをそもそも作れない
+    // （EILSEQ / Illegal byte sequence）。ツール側の問題ではなく検査の前提が
+    // 成り立たないため、その場合は理由を示して検査しない。
+    if let Err(e) = std::fs::write(&input, b"probe") {
+        eprintln!(
+            "スキップ: このファイルシステムは UTF-8 でないファイル名を作れません（{}）。\n  \
+             macOS などでは、そもそもこの状況が発生しません。",
+            e
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+        return;
+    }
+    let _ = std::fs::remove_file(&input);
+
     write_test_wav_mono(&input);
     assert!(input.is_file(), "UTF-8 でない名前でファイルを作れる");
 
