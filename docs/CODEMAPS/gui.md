@@ -10,7 +10,7 @@ Windows専用。.NET Framework（Windows同梱）のみで動く。外部パッ�
 |---|---|---|
 | `gui/App.cs` | 111 | `FilterForm`。画面とエンジン起動 |
 | `gui/AudioCore.cs` | 64 | `WaveData`。RIFF/WAVの読み書きと変換 |
-| `gui/Tests.cs` | 714 | `WaveData` の単体テスト60件 + xUnit相当の枠組み |
+| `gui/Tests.cs` | 782 | 単体テスト63件（`WaveData` 60 + 画面の読み上げ対応 3）+ xUnit相当の枠組み |
 | `gui/Verify.cs` | 57 | 実エンジンとGUIを通す統合テスト |
 
 `gui/App.cs` と `gui/AudioCore.cs` の関係は、CLI版の `main.rs`+`engine.rs` と `wave.rs` に対応する。
@@ -78,7 +78,10 @@ FilterForm （縦積み FlowLayoutPanel）
 
 ## テスト
 
-`Tests.exe`（`gui/build-tests.cmd` で生成）が `WaveData` の60件を検査。エンジン不要で数十ミリ秒。
+`Tests.exe`（`gui/build-tests.cmd` で生成）が63件を検査。エンジン不要で数十ミリ秒。CIで走る唯一のC#テスト。
+
+- `WaveData` 60件
+- 画面の読み上げ対応3件（`FormAccessibilityTests`）。`FilterForm` を生成し、操作部品の `AccessibleName` を検査する。画面は表示しないためエンジンは要らない。このため `build-tests.cmd` は `App.cs` も取り込み、`/main:TestRunner` で入口を明示している
 
 `Verify.exe`（`gui/build-verify.cmd`）は実エンジンとGUIを通す統合テスト。リフレクションで `FilterForm` の私有メンバーを操作し、モノラル／ステレオ両方で以下を確認する。
 
@@ -88,3 +91,7 @@ FilterForm （縦積み FlowLayoutPanel）
 - モデルが波形を変えること
 - 中止時に結果を公開しないこと
 - 画面を `verification/*/app-preview.png` に保存
+
+**検査していないもの：UIとロジックの結線。** `Verify.exe` はボタンを押さず、`StartFilter` を直接呼ぶ。テキストボックスにも代入で値を入れる。そのため `run.Click += …` を消しても全項目が通る。クリック経路を検査するには UI Automation（pywinauto など）が要るが、それは第三者パッケージの導入を意味する。
+
+**`Verify.exe` はCIで実行していない。** `ci.yml` のC#ジョブが走らせるのは `Tests.exe` だけ。手元で明示的に実行しない限り、この経路は検証されない。
