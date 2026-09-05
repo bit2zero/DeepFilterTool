@@ -1,0 +1,17 @@
+# Generated applications and local verification artifacts
+*.exe
+*.pdb
+sessions/
+verification/
+
+# Downloaded engine/model; provenance and license remain tracked
+runtime/*
+!runtime/manifest.json
+!runtime/LICENSE-MIT.txt
+
+# Local credentials and editor files
+.env
+.env.*
+*.key
+*.pem
+.vs/

@@ -1,0 +1,20 @@
+[
+  {
+    "file": "deep-filter.exe",
+    "url": "https://github.com/Rikorose/DeepFilterNet/releases/download/v0.5.6/deep-filter-0.5.6-x86_64-pc-windows-msvc.exe",
+    "bytes": 26912256,
+    "sha256": "75e11fa16445f560cb6b021521ddb89e89270d13b83089705d98776f58fd7915"
+  },
+  {
+    "file": "DeepFilterNet3_onnx.tar.gz",
+    "url": "https://raw.githubusercontent.com/Rikorose/DeepFilterNet/v0.5.6/models/DeepFilterNet3_onnx.tar.gz",
+    "bytes": 7983136,
+    "sha256": "c94d91f70911001c946e0fabb4aa9adc37045f45a03b56008cb0c8244cb63616"
+  },
+  {
+    "file": "LICENSE-MIT.txt",
+    "url": "https://raw.githubusercontent.com/Rikorose/DeepFilterNet/v0.5.6/LICENSE-MIT",
+    "bytes": 1083,
+    "sha256": "24e6bb09c928af8d8e56268082f87413247ce36b39dd5d33add2f9893968065e"
+  }
+]
