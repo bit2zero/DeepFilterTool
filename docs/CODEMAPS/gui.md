@@ -94,4 +94,4 @@ FilterForm （縦積み FlowLayoutPanel）
 
 **検査していないもの：UIとロジックの結線。** `Verify.exe` はボタンを押さず、`StartFilter` を直接呼ぶ。テキストボックスにも代入で値を入れる。そのため `run.Click += …` を消しても全項目が通る。クリック経路を検査するには UI Automation（pywinauto など）が要るが、それは第三者パッケージの導入を意味する。
 
-**`Verify.exe` はCIで実行していない。** `ci.yml` のC#ジョブが走らせるのは `Tests.exe` だけ。手元で明示的に実行しない限り、この経路は検証されない。
+**`Verify.exe` はCIで実行しない（意図的）。** `ci.yml` のC#ジョブが走らせるのは `Tests.exe` だけ。実エンジンの導入が要るうえ実行時間も長いため、CIには載せない判断をしている。この経路を検証したい場合は手元で `gui\build-verify.cmd && Verify.exe` を実行する。
