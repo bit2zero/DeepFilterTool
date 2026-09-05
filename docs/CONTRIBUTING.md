@@ -5,7 +5,7 @@
 | | 場所 | 必要なもの |
 |---|---|---|
 | クロスプラットフォームCLI（Rust） | `cli/` | Rust 1.77 以降 |
-| Windows GUI（C#） | リポジトリ直下 | Windows 同梱の .NET Framework のみ |
+| Windows GUI（C#） | `gui/` | Windows 同梱の .NET Framework のみ |
 
 ## 守っている方針
 
@@ -65,13 +65,13 @@ cargo run --release -- check
 | `cargo run --release -- setup` | 公式エンジンとモデルの導入 |
 | `cargo run --release -- check` | 導入状態の確認 |
 
-### C#（リポジトリ直下で実行）
+### C#（リポジトリ直下で実行。スクリプトは `gui/` にある）
 
 | コマンド | 生成物 | 内容 |
 |---|---|---|
-| `Build.cmd` | `DeepFilterTool.exe` | GUI本体。既存EXEがあると上書きを拒否します |
-| `Build-Tests.cmd` | `Tests.exe` | `WaveData` の単体テスト |
-| `Build-Verify.cmd` | `Verify.exe` | 実エンジンとGUIを通す統合テスト |
+| `gui/build.cmd` | `DeepFilterTool.exe` | GUI本体。既存EXEがあると上書きを拒否します |
+| `gui/build-tests.cmd` | `Tests.exe` | `WaveData` の単体テスト |
+| `gui/build-verify.cmd` | `Verify.exe` | 実エンジンとGUIを通す統合テスト |
 
 `Tests.exe` は引数に文字列を渡すと名前で絞り込めます（例: `Tests.exe Read_`）。
 
@@ -107,7 +107,7 @@ cargo run --release -- check
 | `cli/src/*_tests.rs` | 単体テスト。`#[cfg(test)] #[path = "..."] mod tests;` で本体に接続 |
 | `cli/tests/*.rs` | 統合テスト。実際に本体を起動する |
 | `cli/tests/common/mod.rs` | 統合テスト共通の道具。各ファイルはここから取り込む |
-| `Tests.cs` | C#の単体テスト。xUnit相当の仕組みを内部に自作 |
+| `gui/Tests.cs` | C#の単体テスト。xUnit相当の仕組みを内部に自作 |
 
 ### 走らせ方
 
@@ -142,7 +142,7 @@ cargo test --all-targets
 Windowsで C# を触った場合は追加で:
 
 ```
-Build-Tests.cmd && Tests.exe
+guibuild-tests.cmd && Tests.exe
 ```
 
 - [ ] `cargo fmt --check` が差分なし

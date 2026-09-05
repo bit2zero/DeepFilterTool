@@ -9,7 +9,7 @@ MIT ライセンスで提供します。全文は [LICENSE](LICENSE) を参照�
 対象は、このリポジトリで作成したファイルです。
 
 - `cli/` — クロスプラットフォームCLI（Rust）
-- `App.cs` / `AudioCore.cs` / `Verify.cs` / `Build.cmd` / `Build.ps1` — Windows GUI版（C#）
+- `gui/` — Windows GUI版（C#）とそのビルドスクリプト
 - `README.md`、`NOTICE.md`、`runtime/manifest.json`
 
 このソフトウェアは外部のパッケージに依存していません。RustのCLIは標準ライブラリのみで書かれており、C#版はWindows標準の.NET Frameworkのみを使います。

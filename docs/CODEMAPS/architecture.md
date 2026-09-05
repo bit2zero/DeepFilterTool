@@ -46,11 +46,16 @@ sessions/日時-ID/clean.wav → 出力先へ移動（不可ならコピー）
 | 場所 | 中身 |
 |---|---|
 | `cli/src/` | Rust本体。8モジュール、1726行 |
-| `cli/tests/` | 統合テスト。実際に本体を起動する |
-| リポジトリ直下 `*.cs` | C#実装。本体175行、テスト771行 |
+| `cli/tests/` | Rustの統合テスト。実際に本体を起動する |
+| `gui/` | C#実装とビルドスクリプト。本体175行、テスト771行 |
+| `docs/` | ドキュメント。`CODEMAPS/` にこのファイル群 |
 | `runtime/` | 公式エンジンとモデル。`manifest.json` 以外は追跡しない |
 | `sessions/` | 作業フォルダー。CLIは既定で削除、GUIは常に残す |
 | `samples/` | 効果測定用の音声（clean / noisy の対） |
+
+リポジトリ直下に置くのは `README.md`、`LICENSE`、`NOTICE.md` と設定ファイルだけ。
+
+**ビルド成果物（`DeepFilterTool.exe` / `Tests.exe` / `Verify.exe`）はリポジトリ直下に出る。** C#の実行ファイルは `AppDomain.CurrentDomain.BaseDirectory` から `runtime/` と `sessions/` を探すため、`runtime/` と同じ階層に置く必要がある。ソースは `gui/` にあるが、出力先だけは直下。
 
 ## 実装が2つある理由
 

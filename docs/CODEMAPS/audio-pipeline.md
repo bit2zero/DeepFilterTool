@@ -1,4 +1,4 @@
-<!-- Generated: 2026-09-05 | Files scanned: cli/src/wave.rs, cli/src/engine.rs, AudioCore.cs | Token estimate: ~800 -->
+<!-- Generated: 2026-09-05 | Files scanned: cli/src/wave.rs, cli/src/engine.rs, gui/AudioCore.cs | Token estimate: ~800 -->
 
 # 音声データの扱い
 
@@ -6,7 +6,7 @@
 
 ## データ構造
 
-`Wave`（Rust `cli/src/wave.rs`）／ `WaveData`（C# `AudioCore.cs`）— 同じ形。
+`Wave`（Rust `cli/src/wave.rs`）／ `WaveData`（C# `gui/AudioCore.cs`）— 同じ形。
 
 | 項目 | 型 | 意味 |
 |---|---|---|

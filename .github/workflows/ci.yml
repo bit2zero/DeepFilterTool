@@ -165,8 +165,9 @@ jobs:
           persist-credentials: false
 
       # Windows 同梱の C# コンパイラだけを使う。NuGet も .NET SDK も使わない。
+      # 実行ファイルはリポジトリ直下に出る（runtime/ を隣に必要とするため）。
       - name: 単体テストをビルドして実行
         shell: cmd
         run: |
-          call Build-Tests.cmd || exit /b 1
+          call gui\build-tests.cmd || exit /b 1
           Tests.exe || exit /b 1

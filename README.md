@@ -1,5 +1,8 @@
 # DeepFilter 音声フィルターツール
 
+[![CI](https://github.com/bit2zero/DeepFilterTool/actions/workflows/ci.yml/badge.svg)](https://github.com/bit2zero/DeepFilterTool/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 録音から雑音を取り除く日本語のツールです。DeepFilterNet3 の公式モデルを公式 Rust CLI で実行します。
 
 **音声処理はすべて手元で完結します。** 音声がネットワークに出ることはありません。通信は最初の一度、公式エンジンを取得するときだけです。

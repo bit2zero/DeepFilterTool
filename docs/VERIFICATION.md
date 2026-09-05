@@ -48,13 +48,25 @@
 - パディング済み中間ファイル `input.wav` は、同じ入力に対して**C#版とバイト完全一致**（モノラル・ステレオとも）。
 - 最終出力 `clean.wav` は、Windows版C#（Windowsビルドのエンジン）とLinux版Rust（muslビルドのエンジン）の比較で、同一サンプル99.99%以上・**最大差1 LSB**。差はエンジンのプラットフォーム別ビルドにおける浮動小数点演算の差によるものです。
 
+**CI（GitHub Actions）で実機確認済み:**
+
+3 OS すべてで、ツールチェーンの用意から書式・静的解析・**公式エンジンの取得と照合**・全テストまでを通しています。
+
+| 環境 | 結果 |
+|---|---|
+| `ubuntu-latest` (x86_64) | 全テスト成功 |
+| `windows-latest` (x86_64) | 全テスト成功 |
+| `macos-latest` (aarch64) | 全テスト成功。検疫属性の解除を含む `setup` と `check` も成功 |
+
+これにより、以前「未確認」としていた Windows・macOS 実機での CLI 実行が確認済みになりました。
+
+CI で判明したこととして、macOS の APFS は**ファイル名として妥当な UTF-8 しか受け付けません**（`Illegal byte sequence`）。UTF-8 でないファイル名を扱う検査は、そもそもその状況が発生しない環境では理由を示して飛ばします。
+
 **コンパイルのみ確認（実行検証なし）:**
 
-- `x86_64-pc-windows-msvc` / `x86_64-apple-darwin` / `aarch64-apple-darwin` / `aarch64-unknown-linux-musl` はテストコードを含めて `cargo check --all-targets` を通過。警告なし。
-- `aarch64-unknown-linux-musl` は実バイナリの生成まで成功。
+- `aarch64-unknown-linux-musl` はテストコードを含めて `cargo check --all-targets` を通過し、実バイナリの生成まで成功。**ARM Linux 実機での実行は未確認**です（CIランナーに該当環境がないため）。
 
 **未確認:**
 
-- Windows・macOS実機でのCLI版の実行。ARM Linux実機での実行。
-- 人の声を含む実録音での聴感評価。統合テストは合成音声を使用しています。
-- macOSのGatekeeper検疫属性解除の実動作。
+- ARM Linux 実機での実行。
+- 人の声を含む実録音での**聴感**評価。数値での効果測定は実録音で行っていますが（[効果の実測値](MEASUREMENT.md)）、聴いての評価はしていません。
