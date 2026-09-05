@@ -1,4 +1,4 @@
-<!-- Generated: 2026-09-05 | Files scanned: 53 | Token estimate: ~800 -->
+<!-- Generated: 2026-09-05 | Files scanned: 56 | Token estimate: ~850 -->
 
 # 全体構成
 
@@ -40,6 +40,7 @@ sessions/日時-ID/clean.wav → 出力先へ移動（不可ならコピー）
 | 本体 → 公式エンジン | コマンドライン引数のみ。**入力は常に `input.wav` という固定名**で渡すため、利用者のファイル名の文字コードがエンジンに影響しない |
 | 本体 → ネットワーク | `setup` サブコマンドのみ。curl / wget / PowerShell を起動して HTTPS で取得 |
 | 本体 → ディスク | `runtime/`（読み取り）、`sessions/`（作業）、出力先 |
+| 保守ツール → ネットワーク | **製品の外**。`.github/scripts/translate-readme.sh` だけが Anthropic API を呼ぶ。ビルド・テスト・実行には一切関与しない |
 
 ## ディレクトリ
 
@@ -49,11 +50,12 @@ sessions/日時-ID/clean.wav → 出力先へ移動（不可ならコピー）
 | `cli/tests/` | Rustの統合テスト。実際に本体を起動する |
 | `gui/` | C#実装とビルドスクリプト。本体175行、テスト771行 |
 | `docs/` | ドキュメント。`CODEMAPS/` にこのファイル群 |
+| `.github/` | `workflows/` に CI と README 翻訳の2本、`scripts/` に翻訳スクリプト |
 | `runtime/` | 公式エンジンとモデル。`manifest.json` 以外は追跡しない |
 | `sessions/` | 作業フォルダー。CLIは既定で削除、GUIは常に残す |
 | `samples/` | 効果測定用の音声（clean / noisy の対） |
 
-リポジトリ直下に置くのは `README.md`、`LICENSE`、`NOTICE.md` と設定ファイルだけ。
+リポジトリ直下に置くのは `README.md`（正本）、`README.en.md`（自動生成）、`LICENSE`、`NOTICE.md` と設定ファイルだけ。
 
 **ビルド成果物（`DeepFilterTool.exe` / `Tests.exe` / `Verify.exe`）はリポジトリ直下に出る。** C#の実行ファイルは `AppDomain.CurrentDomain.BaseDirectory` から `runtime/` と `sessions/` を探すため、`runtime/` と同じ階層に置く必要がある。ソースは `gui/` にあるが、出力先だけは直下。
 
