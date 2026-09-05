@@ -11,6 +11,8 @@ DeepFilterNet3の公式ONNXモデルを公式Rust CLIで実行する、日本語
 
 どちらも同じ処理を行います。音声処理はすべてローカルで、通信は公式ファイルの取得時のみです。
 
+開発・ビルド・テストの手順、環境変数の一覧、困ったときの対処は [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) にまとめています。
+
 ## 共通の仕様
 
 - 入力は48 kHz、モノラルまたはステレオのWAV。PCM 16bit / IEEE Float 32bit対応。
