@@ -71,3 +71,4 @@ C#版が先にあり、Windows向けGUIとして完成・検証済み。Rust版�
 - GUIの内部: [gui.md](gui.md)
 - 音声データの扱い: [audio-pipeline.md](audio-pipeline.md)
 - 外部依存: [dependencies.md](dependencies.md)
+- UML 図による仕様: [SPECIFICATION.md](../SPECIFICATION.md)
