@@ -593,10 +593,8 @@ stateDiagram-v2
 
     待機 --> 選択済み : WAVを選択
     未導入 --> 選択済み : WAVを選択
-    選択済み --> 選択済み : WAVを選び直す
 
     選択済み --> 処理中 : ノイズを除去
-    選択済み --> 選択済み : 検証失敗
 
     state 処理中 {
         [*] --> 実行
@@ -627,6 +625,8 @@ stateDiagram-v2
 
 ボタンの有効・無効は、ファイルを選んだかどうかでは切り替わらない。そのため「未導入」や「待機」でも「ノイズを除去」は押せる。押すと `StartFilter()` が、エンジンが未導入であること、または WAV を読めないことをエラーとして表示し、状態は変わらない。
 
+図には、状態が変わらない操作を描いていない。「選択済み」で WAV を選び直したときと、「ノイズを除去」が検証で失敗したときがこれに当たる。選び直すと、前回の処理結果は破棄される。
+
 ### 6.2 作業フォルダー（`sessions/日時-ID/`）
 
 ```mermaid
@@ -637,8 +637,7 @@ stateDiagram-v2
     エンジン出力あり --> 結果あり : clean.wav
 
     結果あり --> 削除 : CLI の既定
-    結果あり --> 保持 : CLI で keep-session か debug
-    結果あり --> 保持 : GUI は常に残す
+    結果あり --> 保持 : GUI、または CLI で keep-session か debug
 
     作成 --> 削除 : CLI で中身が空のまま失敗
     中間あり --> 保持 : 失敗
@@ -716,12 +715,12 @@ flowchart TB
                 s1["日時-ID/<br/>input.wav<br/>filtered/input.wav<br/>engine.log<br/>clean.wav"]
             end
         end
-        userfiles[("利用者の WAV")]
+        userfiles[("利用者の WAV<br/>入力と出力")]
     end
 
     exe1 & exe2 -->|起動| df
     exe1 & exe2 -->|作業| ss
-    exe1 & exe2 <-->|入出力| userfiles
+    exe1 & exe2 <--> userfiles
 ```
 
 基点（`runtime/` と `sessions/` を置く場所）の決め方:
